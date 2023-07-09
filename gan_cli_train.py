@@ -112,7 +112,7 @@ def main(
     if "SLURM_JOB_ID" in os.environ:
         version += f"___job_id_{os.environ['SLURM_JOB_ID']}"
 
-    tensorboard_logger = TensorBoardLogger(save_dir="logs/", version=version)
+    tensorboard_logger = TensorBoardLogger(save_dir="logs/", version=version, name="CycleGAN_model_logger")
     csv_logger = CSVLogger(save_dir="logs/", version=version)
 
     trainer = Trainer(

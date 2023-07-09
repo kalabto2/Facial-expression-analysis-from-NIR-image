@@ -1,7 +1,10 @@
+import copy
+
 import torch
 import torch.nn as nn
-import lightning.pytorch as pl
+import lightning.pytorch as l
 import torch.nn.functional as F
+from torchvision.utils import make_grid
 
 
 class Generator(nn.Module):
@@ -119,7 +122,7 @@ class ResidualBlock(nn.Module):
         return out
 
 
-class CycleGAN(pl.LightningModule):
+class CycleGAN(l.LightningModule):
     def __init__(self, input_nc, output_nc, n_residual_blocks=6, lr=0.0002, beta1=0.5, lambda_idt=0.5):
         super(CycleGAN, self).__init__()
 
@@ -219,9 +222,13 @@ class CycleGAN(pl.LightningModule):
         # get source and target image
         real_x, real_y = batch
 
-        # # Generate fake images
-        # fake_y = self.generator_g2f(real_x)
-        # fake_x = self.generator_f2g(real_y)
+        # Generate fake images
+        fake_y = self.generator_g2f(real_x)
+        fake_x = self.generator_f2g(real_y)
+
+        # TODO log images
+        grid = make_grid([real_x[0], fake_y[0], real_y[0], fake_x[0]], nrow=2)
+        self.logger.experiment.add_image("generated_images", grid, self.global_step / 4)
 
         # # Generate identities
         # id_y = self.generator_g2f(real_y)
@@ -231,19 +238,20 @@ class CycleGAN(pl.LightningModule):
         # rec_y = self.generator_g2f(fake_x)
         # rec_x = self.generator_f2g(fake_y)
 
+        # torch.autograd.set_detect_anomaly(True)
+
         # get optimizers for each model
         optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
 
         # calculate generators loss
-        generator_loss = self.generator_loss_computation(real_x, real_y)
+        # generator_loss = self.generator_loss_computation(real_x, real_y)
+        # g = copy.copy(generator_loss)
 
         # calculate discriminators loss
-        discriminator_loss = self.discriminator_loss_computation(real_x, real_y)
+        # discriminator_loss = self.discriminator_loss_computation(real_x, real_y)
 
         # ================== BACKPROPAGATE ==================
         # ---------------- TRAIN GENERATOR G ----------------
-
-        # TODO? Log the image?
 
         self.toggle_optimizer(optimizer_g)
 
@@ -254,7 +262,7 @@ class CycleGAN(pl.LightningModule):
         # id_loss = self.identity_loss(real_x, real_y)
         # g_loss = adv_loss + self.lambda_cycle * cycle_cons_loss + self.lambda_idt * id_loss
 
-        # g_loss = self.generator_loss_computation(real_x, real_y)
+        g_loss = self.generator_loss_computation(real_x, real_y)
 
         # # Backpropagate the loss
         # self.log("g_loss", g_loss, prog_bar=True)
@@ -262,13 +270,11 @@ class CycleGAN(pl.LightningModule):
         # optimizer_g.step()
         # optimizer_g.zero_grad()
 
-        self.backpropagate_loss(optimizer_g, generator_loss, "g_loss")
+        self.backpropagate_loss(optimizer_g, g_loss, "g_loss")
 
         self.untoggle_optimizer(optimizer_g)
 
         # ---------------- TRAIN GENERATOR F ----------------
-
-        # TODO? Log the image?
 
         self.toggle_optimizer(optimizer_f)
 
@@ -278,7 +284,7 @@ class CycleGAN(pl.LightningModule):
         # id_loss = self.identity_loss(real_x, real_y)
         # f_loss = adv_loss + self.lambda_cycle * cycle_cons_loss + self.lambda_idt * id_loss
 
-        f_loss = self.generator_loss_computation(real_x, real_y)
+        f_loss = self.generator_loss_computation(real_y, real_x)
 
         # # Backpropagate the loss
         # self.log("f_loss", f_loss, prog_bar=True)
@@ -304,11 +310,15 @@ class CycleGAN(pl.LightningModule):
 
         self.toggle_optimizer(optimizer_d_y)
 
-        d_y_loss = self.discriminator_loss_computation(real_x, real_y)
+        d_y_loss = self.discriminator_loss_computation(real_y, real_x)
 
         self.backpropagate_loss(optimizer_d_y, d_y_loss, "d_y_loss")
 
         self.untoggle_optimizer(optimizer_d_y)
+
+        # ===================================================
+
+        # TODO add some self.log_dict()?
 
         # # Adversarial ground truths
         # valid = torch.ones((real_x.size(0), *self.discriminator_x.output_shape))

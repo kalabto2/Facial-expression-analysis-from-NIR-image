@@ -1,23 +1,22 @@
 # libraries for the heavy-duty neural network stuff
 -f https://download.pytorch.org/whl/torch_stable.html
-torch
-torchaudio
-torchdata
-pytorch-lightning
-torchmetrics
-tensorboard
-lightning
-torchvision
+torch==2.0.1
+torchaudio==2.0.2
+torchdata==0.6.1
+torchmetrics==0.11.4
+tensorboard==2.13.0
+lightning==2.0.4
+torchvision==0.15.2
 
 # always useful in any data science project (but not required)
-numpy
-scikit-learn
-matplotlib
-jupyterlab
-seaborn
-pandas
-tqdm
-jupyter
+numpy==1.25.0
+scikit-learn==1.2.2
+matplotlib==3.7.1
+jupyterlab==4.0.2
+seaborn==0.12.2
+pandas==2.0.2
+tqdm==4.65.0
+
 
 # useful for automatically formatting your code
 # in one style (but not required)
@@ -28,3 +27,5 @@ black==22.12.0
 
 # fix bug with tensorboard
 setuptools==59.5.0
+
+jupyter==1.0.0
