@@ -162,25 +162,10 @@ class CycleGAN(l.LightningModule):
 
         return [optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y], []  # TODO add here a scheduler in the 2nd list
 
-    def set_requires_grad(self, nets, requires_grad=False):
-        for net in nets:
-            for param in net.parameters():
-                param.requires_grad = requires_grad
-
-    # def train_discriminator(self, discriminator, real, fake):
-    #     pred_real = discriminator(real)
-    #     loss_real = self.criterion_GAN(pred_real, torch.ones_like(pred_real))
-    #     pred_fake = discriminator(fake.detach())
-    #     loss_fake = self.criterion_GAN(pred_fake, torch.zeros_like(pred_fake))
-    #     loss_discriminator = (loss_real + loss_fake) * 0.5
-    #     return loss_discriminator
-
-    def adversarial_loss(self, x, y):
-        x_l = self.discriminator_x(self.generator_f2g(y))
-        y_l = self.discriminator_y(self.generator_g2f(x))
-        val_x = self.generator_loss(x_l, torch.ones_like(x_l))
-        val_y = self.generator_loss(y_l, torch.ones_like(y_l))
-        return (val_x + val_y) / 2
+    # def set_requires_grad(self, nets, requires_grad=False):
+    #     for net in nets:
+    #         for param in net.parameters():
+    #             param.requires_grad = requires_grad
 
     def cycle_consistency_loss(self, x, y):
         reconstruction_x = self.mae(self.generator_f2g(self.generator_g2f(x)), x)
@@ -192,31 +177,11 @@ class CycleGAN(l.LightningModule):
         id_y = self.mae(self.generator_g2f(y), y)
         return (id_x + id_y) / 2
 
-    def discriminator_loss_computation(self, x_real, y_real):
-        d = self.discriminator_x(self.generator_f2g(y_real))
-        d_x_gen_loss = self.discriminator_loss(d, torch.zeros_like(d))
-        d_y_gen_loss = self.discriminator_loss(self.discriminator_y(self.generator_g2f(x_real)),
-                                               torch.zeros_like(d))
-        d_x_valid_loss = self.discriminator_loss(self.discriminator_x(x_real), torch.ones_like(d))
-        d_y_valid_loss = self.discriminator_loss(self.discriminator_y(y_real), torch.ones_like(d))
-
-        d_gen_loss = (d_x_gen_loss + d_y_gen_loss) / 2
-
-        d_loss = (d_gen_loss + d_x_valid_loss + d_y_valid_loss) / 3
-
-        return d_loss
-
     def backpropagate_loss(self, optimizer, loss, loss_name):
         self.log(loss_name, loss, prog_bar=True)
         self.manual_backward(loss, retain_graph=True)
         optimizer.step()
         optimizer.zero_grad()
-
-    def generator_loss_computation(self, real_x, real_y):
-        adv_loss = self.adversarial_loss(real_x, real_y)
-        cycle_cons_loss = self.cycle_consistency_loss(real_x, real_y)
-        id_loss = self.identity_loss(real_x, real_y)
-        return adv_loss + self.lambda_cycle * cycle_cons_loss + self.lambda_idt * id_loss
 
     def training_step(self, batch, batch_idx):
         # get source and target image
@@ -226,50 +191,34 @@ class CycleGAN(l.LightningModule):
         fake_y = self.generator_g2f(real_x)
         fake_x = self.generator_f2g(real_y)
 
-        # TODO log images
+        # Generate identities
+        id_y = self.generator_g2f(real_y)
+        id_x = self.generator_f2g(real_x)
+
+        # Generate reconstructed image
+        rec_y = self.generator_g2f(fake_x)
+        rec_x = self.generator_f2g(fake_y)
+
+        # log images - real_x, fake_y, real_y and fake_x
         grid = make_grid([real_x[0], fake_y[0], real_y[0], fake_x[0]], nrow=2)
         self.logger.experiment.add_image("generated_images", grid, self.global_step / 4)
 
-        # # Generate identities
-        # id_y = self.generator_g2f(real_y)
-        # id_x = self.generator_f2g(real_x)
-        #
-        # # Generate reconstructed image
-        # rec_y = self.generator_g2f(fake_x)
-        # rec_x = self.generator_f2g(fake_y)
-
-        # torch.autograd.set_detect_anomaly(True)
-
         # get optimizers for each model
         optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
-
-        # calculate generators loss
-        # generator_loss = self.generator_loss_computation(real_x, real_y)
-        # g = copy.copy(generator_loss)
-
-        # calculate discriminators loss
-        # discriminator_loss = self.discriminator_loss_computation(real_x, real_y)
 
         # ================== BACKPROPAGATE ==================
         # ---------------- TRAIN GENERATOR G ----------------
 
         self.toggle_optimizer(optimizer_g)
 
+        # calculate loss
+        discrimined_y = self.discriminator_y(fake_y)
+        g_adv_loss = self.generator_loss(discrimined_y, torch.ones_like(discrimined_y))
+        g_cycle_consistency_loss = self.mae(rec_x, real_x)
+        g_identity_loss = self.mae(id_y, real_y)
+        g_loss = g_adv_loss + self.lambda_cycle * g_cycle_consistency_loss + self.lambda_idt * g_identity_loss
 
-        # # calculate losses
-        # adv_loss = self.adversarial_loss(real_x, real_y)
-        # cycle_cons_loss = self.cycle_consistency_loss(real_x, real_y)
-        # id_loss = self.identity_loss(real_x, real_y)
-        # g_loss = adv_loss + self.lambda_cycle * cycle_cons_loss + self.lambda_idt * id_loss
-
-        g_loss = self.generator_loss_computation(real_x, real_y)
-
-        # # Backpropagate the loss
-        # self.log("g_loss", g_loss, prog_bar=True)
-        # self.manual_backward(g_loss)
-        # optimizer_g.step()
-        # optimizer_g.zero_grad()
-
+        # backpropagate the loss
         self.backpropagate_loss(optimizer_g, g_loss, "g_loss")
 
         self.untoggle_optimizer(optimizer_g)
@@ -278,20 +227,17 @@ class CycleGAN(l.LightningModule):
 
         self.toggle_optimizer(optimizer_f)
 
-        # # calculate losses
-        # adv_loss = self.adversarial_loss(real_x, real_y)
-        # cycle_cons_loss = self.cycle_consistency_loss(real_x, real_y)
-        # id_loss = self.identity_loss(real_x, real_y)
-        # f_loss = adv_loss + self.lambda_cycle * cycle_cons_loss + self.lambda_idt * id_loss
+        # recalculate for pytorch fixme?
+        rec_y_2 = self.generator_g2f(fake_x)
 
-        f_loss = self.generator_loss_computation(real_y, real_x)
+        # calculate loss
+        discrimined_x = self.discriminator_x(fake_x)
+        f_adv_loss = self.generator_loss(discrimined_x, torch.ones_like(discrimined_x))
+        f_cycle_consistency_loss = self.mae(rec_y_2, real_y)
+        f_identity_loss = self.mae(id_x, real_x)
+        f_loss = f_adv_loss + self.lambda_cycle * f_cycle_consistency_loss + self.lambda_idt * f_identity_loss
 
-        # # Backpropagate the loss
-        # self.log("f_loss", f_loss, prog_bar=True)
-        # self.manual_backward(f_loss)
-        # optimizer_f.step()
-        # optimizer_f.zero_grad()
-
+        # backpropagate the loss
         self.backpropagate_loss(optimizer_f, f_loss, "f_loss")
 
         self.untoggle_optimizer(optimizer_f)
@@ -300,8 +246,19 @@ class CycleGAN(l.LightningModule):
 
         self.toggle_optimizer(optimizer_d_x)
 
-        d_x_loss = self.discriminator_loss_computation(real_x, real_y)
+        # recalculate for pytorch fixme?
+        fake_x_2 = self.generator_f2g(real_y)
 
+        # discriminate the real and fake images
+        x_dis_real = self.discriminator_x(real_x)
+        x_dis_fake = self.discriminator_x(fake_x_2)
+
+        # calculate loss
+        d_x_loss_real = self.discriminator_loss(x_dis_real, torch.ones_like(x_dis_real))
+        d_x_loss_fake = self.discriminator_loss(x_dis_fake, torch.zeros_like(x_dis_fake))
+        d_x_loss = d_x_loss_real + d_x_loss_fake
+
+        # backpropagate the loss
         self.backpropagate_loss(optimizer_d_x, d_x_loss, "d_x_loss")
 
         self.untoggle_optimizer(optimizer_d_x)
@@ -310,8 +267,19 @@ class CycleGAN(l.LightningModule):
 
         self.toggle_optimizer(optimizer_d_y)
 
-        d_y_loss = self.discriminator_loss_computation(real_y, real_x)
+        # recalculate for pytorch fixme?
+        fake_y_2 = self.generator_g2f(real_x)
 
+        # discriminate the real and fake images
+        y_dis_real = self.discriminator_y(real_y)
+        y_dis_fake = self.discriminator_y(fake_y_2)
+
+        # calculate the loss
+        d_y_loss_real = self.discriminator_loss(y_dis_real, torch.ones_like(y_dis_real))
+        d_y_loss_fake = self.discriminator_loss(y_dis_fake, torch.zeros_like(y_dis_fake))
+        d_y_loss = d_y_loss_real + d_y_loss_fake
+
+        # backpropagate the loss
         self.backpropagate_loss(optimizer_d_y, d_y_loss, "d_y_loss")
 
         self.untoggle_optimizer(optimizer_d_y)
@@ -319,67 +287,3 @@ class CycleGAN(l.LightningModule):
         # ===================================================
 
         # TODO add some self.log_dict()?
-
-        # # Adversarial ground truths
-        # valid = torch.ones((real_x.size(0), *self.discriminator_x.output_shape))
-        # fake = torch.zeros((real_x.size(0), *self.discriminator_x.output_shape))
-        #
-        # # Generate fake images
-        # fake_y = self.generator_g(real_x)
-        # fake_x = self.generator_f(real_y)
-        #
-        # # Train generators
-        # if optimizer_idx == 0:
-        #     # Identity loss
-        #     identity_x = self.generator_f(real_x)
-        #     identity_y = self.generator_g(real_y)
-        #     loss_identity = self.criterion_identity(identity_x, real_x) + self.criterion_identity(identity_y, real_y)
-        #
-        #     # GAN loss
-        #     loss_gan_g = self.criterion_GAN(self.discriminator_y(fake_y), valid)
-        #     loss_gan_f = self.criterion_GAN(self.discriminator_x(fake_x), valid)
-        #     loss_generator = loss_gan_g + loss_gan_f + self.lambda_idt * loss_identity
-        #
-        #     self.log('train_loss_generator', loss_generator)
-        #     return loss_generator
-        #
-        # # Train discriminators
-        # elif optimizer_idx == 1:
-        #     loss_discriminator_x = self.train_discriminator(self.discriminator_x, real_x, fake_x)
-        #     self.log('train_loss_discriminator_x', loss_discriminator_x)
-        #     return loss_discriminator_x
-        #
-        # elif optimizer_idx == 2:
-        #     loss_discriminator_y = self.train_discriminator(self.discriminator_y, real_y, fake_y)
-        #     self.log('train_loss_discriminator_y', loss_discriminator_y)
-        #     return loss_discriminator_y
-
-    # def on_train_epoch_end(self, outputs):
-    #     # Log images
-    #     if self.current_epoch % self.sample_interval == 0:
-    #         self.sample_images()
-
-    # def configure_optimizers(self):
-    #     # Optimizers
-    #     optimizer_g = torch.optim.Adam(
-    #         itertools.chain(self.generator_g.parameters(), self.generator_f.parameters()),
-    #         lr=self.lr, betas=(self.beta1, 0.999))
-    #
-    #     optimizer_d_x = torch.optim.Adam(self.discriminator_x.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-    #     optimizer_d_y = torch.optim.Adam(self.discriminator_y.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-    #
-    #     return {
-    #         'optimizer': [optimizer_g, optimizer_d_x, optimizer_d_y],
-    #         'frequency': self.discriminator_freq,
-    #         'interval': self.generator_freq
-    #     }
-
-    # def sample_images(self):
-    #     """Saves a generated sample from the validation set"""
-    #     real_x, real_y = next(iter(self.val_dataloader()))
-    #     real_x = real_x.to(self.device)
-    #     real_y = real_y.to(self.device)
-    #     fake_y = self.generator_g(real_x)
-    #     fake_x = self.generator_f(real_y)
-    #     img_sample = torch.cat((real_x.data, fake_y.data, real_y.data, fake_x.data), -2)
-    #     save_image(img_sample, f"{self.logger.log_dir}/epoch-{self.current_epoch}.png", nrow=8, normalize=True)
