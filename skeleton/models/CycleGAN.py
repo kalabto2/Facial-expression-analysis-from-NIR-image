@@ -1,5 +1,3 @@
-import copy
-
 import torch
 import torch.nn as nn
 import lightning.pytorch as l
@@ -8,7 +6,8 @@ from torchvision.utils import make_grid
 
 
 class Generator(nn.Module):
-    def __init__(self, input_nc, output_nc, n_residual_blocks=6):   # TODO: somewhere they menttion that n_residual_blocks should be 9
+    def __init__(self, input_nc, output_nc,
+                 n_residual_blocks=6):  # TODO: somewhere they menttion that n_residual_blocks should be 9
         super(Generator, self).__init__()
 
         # Downsample
@@ -64,7 +63,7 @@ class Generator(nn.Module):
 
 
 class Discriminator(nn.Module):
-    def __init__(self, input_nc):
+    def __init__(self, input_nc, output_shape):
         super(Discriminator, self).__init__()
 
         # define architecture
@@ -88,7 +87,7 @@ class Discriminator(nn.Module):
         )
 
         # get the output tensor shape
-        self.output_shape = self._get_conv_output_size((240, 320))  # TODO refactor so it is not hardcoded
+        self.output_shape = self._get_conv_output_size(output_shape)
 
     def _get_conv_output_size(self, input_size):
         _input = torch.zeros(1, self.seq[0].in_channels, *input_size)
@@ -123,49 +122,41 @@ class ResidualBlock(nn.Module):
 
 
 class CycleGAN(l.LightningModule):
-    def __init__(self, input_nc, output_nc, n_residual_blocks=6, lr=0.0002, beta1=0.5, lambda_idt=0.5):
+    def __init__(self, input_nc, output_nc, n_residual_blocks=6, lr=0.0002, beta1=0.5, lambda_idt=0.5, lambda_cycle=5,
+                 image_shape=(240, 320), log_nth_image=100):
         super(CycleGAN, self).__init__()
 
-        # TODO all those parameters to self.save_hyperparameters() -> better, bcs shorter
+        # saves all arguments of __init__() as hyperparameters
+        self.save_hyperparameters()
+
+        # define Generators and Discriminators
         self.generator_g2f = Generator(input_nc, output_nc, n_residual_blocks)
         self.generator_f2g = Generator(output_nc, input_nc, n_residual_blocks)
-        self.discriminator_x = Discriminator(input_nc)
-        self.discriminator_y = Discriminator(output_nc)
+        self.discriminator_x = Discriminator(input_nc, image_shape)
+        self.discriminator_y = Discriminator(output_nc, image_shape)
 
-        self.lr = lr
-        self.beta1 = beta1
-        self.lambda_idt = lambda_idt
-
-        self.criterion_GAN = nn.MSELoss()
-        self.criterion_cycle = nn.L1Loss()
-        self.criterion_identity = nn.L1Loss()
-
-        # set automatic optimization to false since we are using multiple optimizers for each model
-        self.automatic_optimization = False
-
-        # TODO add them as arguments, not hardcoded
-        self.lambda_cycle = 5
-
-        # set losses TODO check it
+        # Define losses TODO check it
         self.mae = nn.L1Loss()
         self.generator_loss = F.binary_cross_entropy_with_logits  # TODO or MSE? + add to init
         self.discriminator_loss = nn.MSELoss()
+
+        # set automatic optimization to false since we are using multiple optimizers for each model
+        self.automatic_optimization = False
 
     def forward(self, x):
         return self.generator_g2f(x)
 
     def configure_optimizers(self):
-        optimizer_g = torch.optim.Adam(self.generator_g2f.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        optimizer_f = torch.optim.Adam(self.generator_f2g.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        optimizer_d_x = torch.optim.Adam(self.discriminator_x.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
-        optimizer_d_y = torch.optim.Adam(self.discriminator_y.parameters(), lr=self.lr, betas=(self.beta1, 0.999))
+        optimizer_g = torch.optim.Adam(self.generator_g2f.parameters(), lr=self.hparams.lr,
+                                       betas=(self.hparams.beta1, 0.999))
+        optimizer_f = torch.optim.Adam(self.generator_f2g.parameters(), lr=self.hparams.lr,
+                                       betas=(self.hparams.beta1, 0.999))
+        optimizer_d_x = torch.optim.Adam(self.discriminator_x.parameters(), lr=self.hparams.lr,
+                                         betas=(self.hparams.beta1, 0.999))
+        optimizer_d_y = torch.optim.Adam(self.discriminator_y.parameters(), lr=self.hparams.lr,
+                                         betas=(self.hparams.beta1, 0.999))
 
         return [optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y], []  # TODO add here a scheduler in the 2nd list
-
-    # def set_requires_grad(self, nets, requires_grad=False):
-    #     for net in nets:
-    #         for param in net.parameters():
-    #             param.requires_grad = requires_grad
 
     def cycle_consistency_loss(self, x, y):
         reconstruction_x = self.mae(self.generator_f2g(self.generator_g2f(x)), x)
@@ -201,7 +192,7 @@ class CycleGAN(l.LightningModule):
 
         # log images - real_x, fake_y, real_y and fake_x
         grid = make_grid([real_x[0], fake_y[0], real_y[0], fake_x[0]], nrow=2)
-        self.logger.experiment.add_image("generated_images", grid, self.global_step / 4)
+        self.logger.experiment.add_image("generated_images", grid, self.global_step / 4 / self.hparams.log_nth_image)
 
         # get optimizers for each model
         optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
@@ -216,7 +207,8 @@ class CycleGAN(l.LightningModule):
         g_adv_loss = self.generator_loss(discrimined_y, torch.ones_like(discrimined_y))
         g_cycle_consistency_loss = self.mae(rec_x, real_x)
         g_identity_loss = self.mae(id_y, real_y)
-        g_loss = g_adv_loss + self.lambda_cycle * g_cycle_consistency_loss + self.lambda_idt * g_identity_loss
+        g_loss = g_adv_loss + self.hparams.lambda_cycle * g_cycle_consistency_loss + \
+                 self.hparams.lambda_idt * g_identity_loss
 
         # backpropagate the loss
         self.backpropagate_loss(optimizer_g, g_loss, "g_loss")
@@ -235,7 +227,8 @@ class CycleGAN(l.LightningModule):
         f_adv_loss = self.generator_loss(discrimined_x, torch.ones_like(discrimined_x))
         f_cycle_consistency_loss = self.mae(rec_y_2, real_y)
         f_identity_loss = self.mae(id_x, real_x)
-        f_loss = f_adv_loss + self.lambda_cycle * f_cycle_consistency_loss + self.lambda_idt * f_identity_loss
+        f_loss = f_adv_loss + self.hparams.lambda_cycle * f_cycle_consistency_loss \
+                 + self.hparams.lambda_idt * f_identity_loss
 
         # backpropagate the loss
         self.backpropagate_loss(optimizer_f, f_loss, "f_loss")

@@ -13,23 +13,23 @@ from torchvision import transforms
 class OuluCasiaDataset(Dataset):
     def __init__(self, root_dir: str, split: str = "VL",
                  transform: Optional[transforms.Compose] = None,
-                 light: Optional[Set[str]] = "Strong", on_the_fly: bool = True):
+                 lights: Optional[Set[str]] = "Strong", on_the_fly: bool = True):
         start = time.time()
 
         assert split == "VL" or split == "NI", f"invalid split value: {split}"
-        assert len(light - {"Strong", "Dark", "Weak"}) == 0, f"invalid light value in {light}"
+        assert len(lights - {"Strong", "Dark", "Weak"}) == 0, f"invalid light value in {lights}"
 
         self.root_dir: str = root_dir
         self.split: str = split
         self.transform: Optional[transforms.Compose] = transform
         self.on_the_fly: bool = on_the_fly
-        self.light: Optional[Set[str]] = light
+        self.light: Optional[Set[str]] = lights
 
-        # retrive VL data filepaths
+        # retrieve VL data filepaths
         self.data_filepaths: List[str] = []
         file_pattern = r"\d{3}\.jpeg"
-        for l in light:
-            for root, directories, filenames in os.walk(os.path.join(self.root_dir, split, l)):
+        for light in lights:
+            for root, directories, filenames in os.walk(os.path.join(self.root_dir, split, light)):
                 matching_filepaths = [os.path.join(root, filename) for filename in filenames if
                                       re.match(file_pattern, filename)]
                 self.data_filepaths.extend(matching_filepaths)
@@ -63,13 +63,14 @@ class OuluCasiaDataset(Dataset):
 
 
 class OuluCasiaDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir: str, batch_size: int):
+    def __init__(self, data_dir: str, batch_size: int, num_workers: int = 2):
         super().__init__()
+        self.image_shape = (240, 320)  # TODO un-hardcode?
+        self.ni_dataset = None
+        self.vl_dataset = None
         self.data_dir = data_dir
         self.batch_size = batch_size
-
-    # def prepare_data(self):
-    #   pass
+        self.num_workers = num_workers
 
     def setup(self, stage=None):
         transform = transforms.Compose([
@@ -77,16 +78,13 @@ class OuluCasiaDataModule(pl.LightningDataModule):
             # TODO Add more transformations as needed
         ])
 
-        self.vl_dataset = OuluCasiaDataset(self.data_dir, split="VL", transform=transform, light={"Strong"})
-        self.ni_dataset = OuluCasiaDataset(self.data_dir, split="NI", transform=transform, light={"Strong"})
+        # TODO get rid of hard fixed data?
+        self.vl_dataset = OuluCasiaDataset(self.data_dir, split="VL", transform=transform, lights={"Strong"})
+        self.ni_dataset = OuluCasiaDataset(self.data_dir, split="NI", transform=transform, lights={"Strong"})
 
     def train_dataloader(self):
-        vl_dataloader = DataLoader(self.vl_dataset, batch_size=self.batch_size, shuffle=True)
-        ni_dataloader = DataLoader(self.ni_dataset, batch_size=self.batch_size, shuffle=True)
+        vl_dataloader = DataLoader(self.vl_dataset, batch_size=self.batch_size, shuffle=True,
+                                   num_workers=self.num_workers)
+        ni_dataloader = DataLoader(self.ni_dataset, batch_size=self.batch_size, shuffle=True,
+                                   num_workers=self.num_workers)
         return vl_dataloader, ni_dataloader
-
-    # def val_dataloader(self):
-    #   pass
-
-    # def test_dataloader(self):
-    #   pass

@@ -7,10 +7,6 @@ from datetime import datetime
 import multiprocessing
 
 import click
-# import pytorch_lightning
-# from pytorch_lightning import LightningModule
-# import torch.nn as nn
-# from lightning_fabric.plugins.environments import SLURMEnvironment
 
 from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import TensorBoardLogger, CSVLogger
@@ -50,10 +46,13 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--epochs", type=int, default=30, help="number of epochs to train for")
 @click.option("--use_gpu", type=bool, default=True, help="whether to use a gpu")
 @click.option("--random_seed", type=int, default=1337, help="the random seed")
-@click.option("--num_workers", type=int, default=multiprocessing.cpu_count(), help="number of workers to use for data loading")
+@click.option("--num_workers", type=int, default=multiprocessing.cpu_count(), help="number of workers to use for data "
+                                                                                   "loading") 
 @click.option("--n_residual_blocks", type=int, default=6, help="Number of residual blocks in both generators")
 @click.option("--beta1", type=float, default=0.5, help="beta1 for Adam")
 @click.option("--lambda_idt", type=float, default=0.5, help="lambda identity parameter for identity loss")
+@click.option("--lambda_cycle", type=float, default=5, help="lambda cycle parameter for cycle loss")
+@click.option("--log_nth_image", type=int, default=100, help="Log every nth image of training")
 def main(
     data_folder: pathlib.Path,
     batch_size: int,
@@ -65,7 +64,9 @@ def main(
     train_optim: str,
     n_residual_blocks: int,
     beta1: float,
-    lambda_idt: float
+    lambda_idt: float,
+    lambda_cycle: float,
+    log_nth_image: int
 ):
     # log input
     print("### input arguments ###")
@@ -74,29 +75,30 @@ def main(
     print(f"epochs={epochs}")
     print(f"use_gpu={use_gpu}")
     print(f"random_seed={random_seed}")
+    print(f"num_workers={num_workers}")
     print(f"train_optim={train_optim}")
     print(f"n_residual_blocks={n_residual_blocks}")
     print(f"beta1={beta1}")
     print(f"lambda_idt={lambda_idt}")
+    print(f"lambda_cycle={lambda_cycle}")
+    print(f"log_nth_image={log_nth_image}")
 
     # set random seed
     seed_everything(random_seed)
 
     # build data loader module
-    dm = OuluCasiaDataModule(str(data_folder), batch_size)
-
-    # setup datasets
-    dm.setup()
-
-    # retrieve dataloaders
-    vl_dataloader, ni_dataloader = dm.train_dataloader()
+    dm = OuluCasiaDataModule(str(data_folder), batch_size, num_workers=num_workers)
 
     # build model
     cycle_gan = CycleGAN(3, 3, n_residual_blocks=n_residual_blocks,
                          lr=learning_rate,
                          beta1=beta1,
-                         lambda_idt=lambda_idt)
+                         lambda_idt=lambda_idt,
+                         lambda_cycle=lambda_cycle,
+                         image_shape=dm.image_shape,
+                         log_nth_image=log_nth_image)
 
+    # TODO what about this?
     # configure callback managing checkpoints, and checkpoint file names
     pattern = "epoch_{epoch:04d}.step_{step:09d}.val-eer_{val_eer:.4f}"
     ModelCheckpoint.CHECKPOINT_NAME_LAST = pattern + ".last"
@@ -107,30 +109,23 @@ def main(
         auto_insert_metric_name=False,
     )
 
-    # initialize trainer
+    # initialize Logger
     version = datetime.now().strftime("version_%Y_%m_%d___%H_%M_%S")
-    if "SLURM_JOB_ID" in os.environ:
-        version += f"___job_id_{os.environ['SLURM_JOB_ID']}"
-
     tensorboard_logger = TensorBoardLogger(save_dir="logs/", version=version, name="CycleGAN_model_logger")
-    csv_logger = CSVLogger(save_dir="logs/", version=version)
+    # csv_logger = CSVLogger(save_dir="logs/", version=version)
 
+    # initialize Trainer
     trainer = Trainer(
         max_epochs=epochs,
         accelerator="gpu" if use_gpu else "cpu",
         devices=1,
         callbacks=[checkpointer, LearningRateMonitor()],
-        logger=[tensorboard_logger, csv_logger],
+        logger=[tensorboard_logger],
         default_root_dir="logs",
-        # plugins=[SLURMEnvironment(auto_requeue=False)],  #
     )
 
     # train loop
     trainer.fit(cycle_gan, dm)
-
-    # # test loop (on dev set)
-    # cycle_gan = cycle_gan.load_from_checkpoint(checkpointer.best_model_path)
-    # trainer.test(cycle_gan, datamodule=dm)
 
 
 if __name__ == "__main__":
