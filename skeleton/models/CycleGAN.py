@@ -182,17 +182,13 @@ class CycleGAN(l.LightningModule):
         fake_y = self.generator_g2f(real_x)
         fake_x = self.generator_f2g(real_y)
 
-        # Generate identities
-        id_y = self.generator_g2f(real_y)
-        id_x = self.generator_f2g(real_x)
-
-        # Generate reconstructed image
-        rec_y = self.generator_g2f(fake_x)
-        rec_x = self.generator_f2g(fake_y)
-
-        # log images - real_x, fake_y, real_y and fake_x
-        grid = make_grid([real_x[0], fake_y[0], real_y[0], fake_x[0]], nrow=2)
-        self.logger.experiment.add_image("generated_images", grid, self.global_step / 4 / self.hparams.log_nth_image)
+        # Generate identities if identity loss included
+        if self.hparams.lambda_idt != 0:
+            id_y = self.generator_g2f(real_y)
+            id_x = self.generator_f2g(real_x)
+        else:
+            id_y = 0
+            id_x = 0
 
         # get optimizers for each model
         optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
@@ -201,6 +197,9 @@ class CycleGAN(l.LightningModule):
         # ---------------- TRAIN GENERATOR G ----------------
 
         self.toggle_optimizer(optimizer_g)
+
+        # Generate reconstructed image
+        rec_x = self.generator_f2g(fake_y)
 
         # calculate loss
         discrimined_y = self.discriminator_y(fake_y)
@@ -219,13 +218,13 @@ class CycleGAN(l.LightningModule):
 
         self.toggle_optimizer(optimizer_f)
 
-        # recalculate for pytorch fixme?
-        rec_y_2 = self.generator_g2f(fake_x)
+        # generate reconstructed image
+        rec_y = self.generator_g2f(fake_x)
 
         # calculate loss
         discrimined_x = self.discriminator_x(fake_x)
         f_adv_loss = self.generator_loss(discrimined_x, torch.ones_like(discrimined_x))
-        f_cycle_consistency_loss = self.mae(rec_y_2, real_y)
+        f_cycle_consistency_loss = self.mae(rec_y, real_y)
         f_identity_loss = self.mae(id_x, real_x)
         f_loss = f_adv_loss + self.hparams.lambda_cycle * f_cycle_consistency_loss \
                  + self.hparams.lambda_idt * f_identity_loss
@@ -278,5 +277,9 @@ class CycleGAN(l.LightningModule):
         self.untoggle_optimizer(optimizer_d_y)
 
         # ===================================================
+
+        # log images
+        grid = make_grid([real_x[0], fake_y[0], rec_x[0], real_y[0], fake_x[0], rec_y[0]], nrow=3)
+        self.logger.experiment.add_image("generated_images", grid, self.global_step / 4 / self.hparams.log_nth_image)
 
         # TODO add some self.log_dict()?
