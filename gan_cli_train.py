@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import os
 import pathlib
 
 from datetime import datetime
@@ -17,6 +16,7 @@ from skeleton.models.CycleGAN import CycleGAN
 
 ########################################################################################
 # entrypoint of script
+
 
 @click.command()
 @click.option(
@@ -53,6 +53,7 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--lambda_idt", type=float, default=0.5, help="lambda identity parameter for identity loss")
 @click.option("--lambda_cycle", type=float, default=10, help="lambda cycle parameter for cycle loss")
 @click.option("--log_nth_image", type=int, default=100, help="Log every nth image of training")
+@click.option("--restore_training_from_checkpoint", type=str, default="", help="TBD")
 def main(
     data_folder: pathlib.Path,
     batch_size: int,
@@ -66,7 +67,8 @@ def main(
     beta1: float,
     lambda_idt: float,
     lambda_cycle: float,
-    log_nth_image: int
+    log_nth_image: int,
+    restore_training_from_checkpoint: str
 ):
     # log input
     print("### input arguments ###")
@@ -98,21 +100,12 @@ def main(
                          image_shape=dm.image_shape,
                          log_nth_image=log_nth_image)
 
-    # TODO what about this?
-    # configure callback managing checkpoints, and checkpoint file names
-    pattern = "epoch_{epoch:04d}.step_{step:09d}.val-eer_{val_eer:.4f}"
-    ModelCheckpoint.CHECKPOINT_NAME_LAST = pattern + ".last"
-    checkpointer = ModelCheckpoint(
-        monitor="val_eer",
-        filename=pattern + ".best",
-        save_last=True,
-        auto_insert_metric_name=False,
-    )
+    checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
 
     # initialize Logger
     version = datetime.now().strftime("version_%Y_%m_%d___%H_%M_%S")
     tensorboard_logger = TensorBoardLogger(save_dir="logs/", version=version, name="CycleGAN_model_logger")
-    # csv_logger = CSVLogger(save_dir="logs/", version=version)
+    # csv_logger = CSVLogger(save_dir="logs/", version=version) # TODO what with this logger?
 
     # initialize Trainer
     trainer = Trainer(
@@ -125,7 +118,8 @@ def main(
     )
 
     # train loop
-    trainer.fit(cycle_gan, dm)
+    trainer.fit(cycle_gan, dm,
+                ckpt_path=restore_training_from_checkpoint if restore_training_from_checkpoint != "" else None)
 
 
 if __name__ == "__main__":
