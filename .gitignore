@@ -3,3 +3,4 @@
 /.idea/
 /experiments/old_logs/
 /experiments/logs/
+*/__pycache__*

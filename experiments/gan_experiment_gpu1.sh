@@ -4,4 +4,5 @@
                     --use_gpu 1 \
                     --num_workers 2 \
                     --log_nth_image 100 \
-                    --lambda_idt 0
+                    --lambda_idt 0 \
+                    --learning_rate 5e-3

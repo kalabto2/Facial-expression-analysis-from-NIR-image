@@ -6,4 +6,6 @@ source ../venv/bin/activate
                     --use_gpu 0 \
                     --num_workers 4 \
                     --log_nth_image 5 \
-                    --lambda_idt 0
+                    --lambda_idt 0 \
+                    --learning_rate 2e-3
+

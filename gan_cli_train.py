@@ -14,61 +14,44 @@ from lightning.pytorch import seed_everything, Trainer
 from skeleton.data.oulu_casia import OuluCasiaDataModule
 from skeleton.models.CycleGAN import CycleGAN
 
+
 ########################################################################################
 # entrypoint of script
 
 
 @click.command()
-@click.option(
-    "--data_folder",
-    type=pathlib.Path,
-    required=True,
-    help="path to folder containing data with images",
-)
-@click.option(
-    "--batch_size",
-    type=int,
-    default=1,
-    help="batch size to use for train and val split",
-)
-@click.option(
-    "--learning_rate",
-    type=float,
-    default=2e-4,
-    help="constant learning rate used during training",
-)
-@click.option(
-    "--train_optim",
-    type=str,
-    default='Adam',
-    help="optimizer used during training",
-)
+@click.option("--data_folder", type=pathlib.Path, required=True, help="path to folder containing data with images")
+@click.option("--batch_size", type=int, default=1, help="batch size to use for train and val split")
+@click.option("--learning_rate", type=float, default=2e-4, help="constant learning rate used during training")
+@click.option("--train_optim", type=str, default='Adam', help="optimizer used during training")
 @click.option("--epochs", type=int, default=30, help="number of epochs to train for")
 @click.option("--use_gpu", type=bool, default=True, help="whether to use a gpu")
 @click.option("--random_seed", type=int, default=1337, help="the random seed")
 @click.option("--num_workers", type=int, default=multiprocessing.cpu_count(), help="number of workers to use for data "
-                                                                                   "loading") 
+                                                                                   "loading")
 @click.option("--n_residual_blocks", type=int, default=6, help="Number of residual blocks in both generators")
 @click.option("--beta1", type=float, default=0.5, help="beta1 for Adam")
 @click.option("--lambda_idt", type=float, default=0.5, help="lambda identity parameter for identity loss")
 @click.option("--lambda_cycle", type=float, default=10, help="lambda cycle parameter for cycle loss")
 @click.option("--log_nth_image", type=int, default=100, help="Log every nth image of training")
 @click.option("--restore_training_from_checkpoint", type=str, default="", help="TBD")
+@click.option("--scheduler_step_freq", type=str, default=10, help="TBD")
 def main(
-    data_folder: pathlib.Path,
-    batch_size: int,
-    learning_rate: float,
-    epochs: int,
-    use_gpu: int,
-    random_seed: int,
-    num_workers: int,
-    train_optim: str,
-    n_residual_blocks: int,
-    beta1: float,
-    lambda_idt: float,
-    lambda_cycle: float,
-    log_nth_image: int,
-    restore_training_from_checkpoint: str
+        data_folder: pathlib.Path,
+        batch_size: int,
+        learning_rate: float,
+        epochs: int,
+        use_gpu: int,
+        random_seed: int,
+        num_workers: int,
+        train_optim: str,
+        n_residual_blocks: int,
+        beta1: float,
+        lambda_idt: float,
+        lambda_cycle: float,
+        log_nth_image: int,
+        restore_training_from_checkpoint: str,
+        scheduler_step_freq: int
 ):
     # log input
     print("### input arguments ###")
@@ -98,7 +81,9 @@ def main(
                          lambda_idt=lambda_idt,
                          lambda_cycle=lambda_cycle,
                          image_shape=dm.image_shape,
-                         log_nth_image=log_nth_image)
+                         log_nth_image=log_nth_image,
+                         scheduler_step_freq=scheduler_step_freq,
+                         )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
 
