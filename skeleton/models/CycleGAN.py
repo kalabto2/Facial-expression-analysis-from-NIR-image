@@ -139,6 +139,11 @@ class CycleGAN(l.LightningModule):
         self.mae = nn.L1Loss()
         self.generator_loss = F.binary_cross_entropy_with_logits  # TODO or MSE? + add to init
         self.discriminator_loss = nn.MSELoss()
+        #
+        # self.adversarial_loss = nn.BCEWithLogitsLoss()
+        # self.cycle_consistence_loss = nn.L1Loss()
+        # self.identity_loss = nn.L1Loss()
+        # self.discriminator_loss = nn.MSELoss()
 
         # set automatic optimization to false since we are using multiple optimizers for each model
         self.automatic_optimization = False
@@ -158,21 +163,20 @@ class CycleGAN(l.LightningModule):
 
         return [optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y], []  # TODO add here a scheduler in the 2nd list
 
-    def cycle_consistency_loss(self, x, y):
-        reconstruction_x = self.mae(self.generator_f2g(self.generator_g2f(x)), x)
-        reconstruction_y = self.mae(self.generator_g2f(self.generator_f2g(y)), y)
-        return (reconstruction_x + reconstruction_y) / 2
-
-    def identity_loss(self, x, y):
-        id_x = self.mae(self.generator_f2g(x), x)
-        id_y = self.mae(self.generator_g2f(y), y)
-        return (id_x + id_y) / 2
-
     def backpropagate_loss(self, optimizer, loss, loss_name):
         self.log(loss_name, loss, prog_bar=True)
+        optimizer.zero_grad()
         self.manual_backward(loss, retain_graph=True)
         optimizer.step()
-        optimizer.zero_grad()
+    #
+    # def generator_loss(self, real_x, real_y, fake_y, rec_x, id_y):
+    #     discrimined_image = self.discriminator_y(fake_y)
+    #     adv_loss = self.generator_loss(discrimined_image, torch.ones_like(discrimined_image))
+    #     cycle_consistency_loss = self.mae(rec_x, real_x)
+    #     identity_loss = self.mae(id_y, real_y) if self.hparams.lambda_idt != 0 else 0
+    #
+    #     return adv_loss + self.hparams.lambda_cycle * cycle_consistency_loss + \
+    #         self.hparams.lambda_idt * identity_loss
 
     def training_step(self, batch, batch_idx):
         # get source and target image
