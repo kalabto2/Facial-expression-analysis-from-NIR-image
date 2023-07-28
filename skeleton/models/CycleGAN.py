@@ -205,7 +205,7 @@ class CycleGAN(l.LightningModule):
         discrimined_y = self.discriminator_y(fake_y)
         g_adv_loss = self.generator_loss(discrimined_y, torch.ones_like(discrimined_y))
         g_cycle_consistency_loss = self.mae(rec_x, real_x)
-        g_identity_loss = self.mae(id_y, real_y)
+        g_identity_loss = self.mae(id_y, real_y) if self.hparams.lambda_idt != 0 else 0
         g_loss = g_adv_loss + self.hparams.lambda_cycle * g_cycle_consistency_loss + \
                  self.hparams.lambda_idt * g_identity_loss
 
@@ -225,7 +225,7 @@ class CycleGAN(l.LightningModule):
         discrimined_x = self.discriminator_x(fake_x)
         f_adv_loss = self.generator_loss(discrimined_x, torch.ones_like(discrimined_x))
         f_cycle_consistency_loss = self.mae(rec_y, real_y)
-        f_identity_loss = self.mae(id_x, real_x)
+        f_identity_loss = self.mae(id_x, real_x) if self.hparams.lambda_idt != 0 else 0
         f_loss = f_adv_loss + self.hparams.lambda_cycle * f_cycle_consistency_loss \
                  + self.hparams.lambda_idt * f_identity_loss
 
@@ -279,7 +279,8 @@ class CycleGAN(l.LightningModule):
         # ===================================================
 
         # log images
-        grid = make_grid([real_x[0], fake_y[0], rec_x[0], real_y[0], fake_x[0], rec_y[0]], nrow=3)
-        self.logger.experiment.add_image("generated_images", grid, self.global_step / 4 / self.hparams.log_nth_image)
+        if self.global_step % (4 * self.hparams.log_nth_image) == 0:
+            grid = make_grid([real_x[0], fake_y[0], rec_x[0], real_y[0], fake_x[0], rec_y[0]], nrow=3)
+            self.logger.experiment.add_image("generated_images", grid, self.global_step / 4)
 
-        # TODO add some self.log_dict()?
+            # TODO add some self.log_dict()?
