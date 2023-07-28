@@ -51,7 +51,7 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--n_residual_blocks", type=int, default=6, help="Number of residual blocks in both generators")
 @click.option("--beta1", type=float, default=0.5, help="beta1 for Adam")
 @click.option("--lambda_idt", type=float, default=0.5, help="lambda identity parameter for identity loss")
-@click.option("--lambda_cycle", type=float, default=5, help="lambda cycle parameter for cycle loss")
+@click.option("--lambda_cycle", type=float, default=10, help="lambda cycle parameter for cycle loss")
 @click.option("--log_nth_image", type=int, default=100, help="Log every nth image of training")
 def main(
     data_folder: pathlib.Path,
