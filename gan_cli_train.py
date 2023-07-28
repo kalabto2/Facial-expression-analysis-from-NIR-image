@@ -35,7 +35,7 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--lambda_cycle", type=float, default=10, help="lambda cycle parameter for cycle loss")
 @click.option("--log_nth_image", type=int, default=100, help="Log every nth image of training")
 @click.option("--restore_training_from_checkpoint", type=str, default="", help="TBD")
-@click.option("--scheduler_step_freq", type=str, default=10, help="TBD")
+@click.option("--scheduler_step_freq", type=int, default=10, help="TBD")
 def main(
         data_folder: pathlib.Path,
         batch_size: int,
@@ -67,6 +67,8 @@ def main(
     print(f"lambda_idt={lambda_idt}")
     print(f"lambda_cycle={lambda_cycle}")
     print(f"log_nth_image={log_nth_image}")
+    print(f"restore_training_from_checkpoint={restore_training_from_checkpoint}")
+    print(f"scheduler_step_freq={scheduler_step_freq}")
 
     # set random seed
     seed_everything(random_seed)
