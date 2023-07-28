@@ -36,6 +36,8 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--log_nth_image", type=int, default=100, help="Log every nth image of training")
 @click.option("--restore_training_from_checkpoint", type=str, default="", help="TBD")
 @click.option("--scheduler_step_freq", type=int, default=10, help="TBD")
+@click.option("--scheduler_n_steps", type=int, default=100, help="TBD")
+@click.option("--scheduler_enabled", type=bool, default=False, help="TBD")
 def main(
         data_folder: pathlib.Path,
         batch_size: int,
@@ -51,7 +53,9 @@ def main(
         lambda_cycle: float,
         log_nth_image: int,
         restore_training_from_checkpoint: str,
-        scheduler_step_freq: int
+        scheduler_step_freq: int,
+        scheduler_n_steps: int,
+        scheduler_enabled: bool
 ):
     # log input
     print("### input arguments ###")
@@ -69,6 +73,8 @@ def main(
     print(f"log_nth_image={log_nth_image}")
     print(f"restore_training_from_checkpoint={restore_training_from_checkpoint}")
     print(f"scheduler_step_freq={scheduler_step_freq}")
+    print(f"scheduler_n_steps={scheduler_n_steps}")
+    print(f"scheduler_enabled={scheduler_enabled}")
 
     # set random seed
     seed_everything(random_seed)
@@ -85,6 +91,8 @@ def main(
                          image_shape=dm.image_shape,
                          log_nth_image=log_nth_image,
                          scheduler_step_freq=scheduler_step_freq,
+                         scheduler_n_steps=scheduler_n_steps,
+                         scheduler_enabled=scheduler_enabled,
                          )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)

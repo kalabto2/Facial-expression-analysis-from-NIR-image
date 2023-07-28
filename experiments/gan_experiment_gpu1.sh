@@ -5,4 +5,4 @@
                     --num_workers 2 \
                     --log_nth_image 100 \
                     --lambda_idt 0 \
-                    --learning_rate 5e-3
+                    --learning_rate 2e-3
