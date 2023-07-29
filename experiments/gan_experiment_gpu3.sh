@@ -1,5 +1,8 @@
 #! /bin/bash
 
+# Compared to previous experiment changed:
+# * n_residual_blocks
+
 # ================= PARAMETERS =================
 log_nth_image=1000
 
@@ -15,9 +18,9 @@ use_gpu=1
 random_seed=1337
 
 # ------------- Architecture -------------------
-n_residual_blocks=6
+n_residual_blocks=9
 lambda_idt=0
-lambda_cycle=10
+lambda_cycle=4
 
 # ------------- Optimization -------------------
 train_optim="Adam"

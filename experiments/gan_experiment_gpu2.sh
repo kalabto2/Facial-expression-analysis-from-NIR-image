@@ -1,9 +1,10 @@
 #! /bin/bash
 
-source ../venv/bin/activate
+# Compared to previous experiment changed:
+# * lambda_cycle
 
 # ================= PARAMETERS =================
-log_nth_image=5
+log_nth_image=1000
 
 # ----------------  Data -----------------------
 data_folder="../data/B_OriginalImg"
@@ -12,22 +13,22 @@ batch_size=1
 # ---------------- Training --------------------
 epochs=30
 restore_training_from_checkpoint="/" # '/' stands for no restore, else specify path
-num_workers=4
-use_gpu=0
+num_workers=2
+use_gpu=1
 random_seed=1337
 
 # ------------- Architecture -------------------
 n_residual_blocks=6
 lambda_idt=0
-lambda_cycle=10
+lambda_cycle=4
 
 # ------------- Optimization -------------------
 train_optim="Adam"
-learning_rate=2e-4
+learning_rate=5e-4
 beta1=0.5
 scheduler_enabled=0
-scheduler_step_freq=10
-scheduler_n_steps=8
+scheduler_step_freq=40
+scheduler_n_steps=1000
 scheduler_eta_min=2e-5
 # ==============================================
 
@@ -49,13 +50,3 @@ scheduler_eta_min=2e-5
                     --scheduler_step_freq $scheduler_step_freq \
                     --scheduler_n_steps $scheduler_n_steps \
                     --scheduler_eta_min $scheduler_eta_min
-
-#../gan_cli_train.py --data_folder ../data/B_OriginalImg \
-#                    --use_gpu 0 \
-#                    --num_workers 4 \
-#                    --log_nth_image 5 \
-#                    --lambda_idt 0 \
-#                    --learning_rate 2e-3 \
-#                    --scheduler_enabled 1 \
-#                    --scheduler_step_freq 4 \
-#                    --scheduler_n_steps 8
