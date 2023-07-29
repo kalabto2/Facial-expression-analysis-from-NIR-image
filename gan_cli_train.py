@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 import pathlib
-
-from datetime import datetime
-
 import multiprocessing
-
 import click
+from datetime import datetime
 
 from lightning.pytorch.callbacks import ModelCheckpoint, LearningRateMonitor
 from lightning.pytorch.loggers import TensorBoardLogger, CSVLogger
@@ -34,10 +31,11 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--lambda_idt", type=float, default=0.5, help="lambda identity parameter for identity loss")
 @click.option("--lambda_cycle", type=float, default=10, help="lambda cycle parameter for cycle loss")
 @click.option("--log_nth_image", type=int, default=100, help="Log every nth image of training")
-@click.option("--restore_training_from_checkpoint", type=str, default="", help="TBD")
+@click.option("--restore_training_from_checkpoint", type=str, default="/", help="TBD")
+@click.option("--scheduler_enabled", type=bool, default=False, help="TBD")
 @click.option("--scheduler_step_freq", type=int, default=10, help="TBD")
 @click.option("--scheduler_n_steps", type=int, default=100, help="TBD")
-@click.option("--scheduler_enabled", type=bool, default=False, help="TBD")
+@click.option("--scheduler_eta_min", type=float, default=2e-5, help="TBD")
 def main(
         data_folder: pathlib.Path,
         batch_size: int,
@@ -53,9 +51,10 @@ def main(
         lambda_cycle: float,
         log_nth_image: int,
         restore_training_from_checkpoint: str,
+        scheduler_enabled: bool,
         scheduler_step_freq: int,
         scheduler_n_steps: int,
-        scheduler_enabled: bool
+        scheduler_eta_min: float
 ):
     # log input
     print("### input arguments ###")
@@ -72,9 +71,10 @@ def main(
     print(f"lambda_cycle={lambda_cycle}")
     print(f"log_nth_image={log_nth_image}")
     print(f"restore_training_from_checkpoint={restore_training_from_checkpoint}")
+    print(f"scheduler_enabled={scheduler_enabled}")
     print(f"scheduler_step_freq={scheduler_step_freq}")
     print(f"scheduler_n_steps={scheduler_n_steps}")
-    print(f"scheduler_enabled={scheduler_enabled}")
+    print(f"scheduler_eta_min={scheduler_eta_min}")
 
     # set random seed
     seed_everything(random_seed)
@@ -93,6 +93,7 @@ def main(
                          scheduler_step_freq=scheduler_step_freq,
                          scheduler_n_steps=scheduler_n_steps,
                          scheduler_enabled=scheduler_enabled,
+                         scheduler_eta_min=scheduler_eta_min,
                          )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
@@ -107,14 +108,14 @@ def main(
         max_epochs=epochs,
         accelerator="gpu" if use_gpu else "cpu",
         devices=1,
-        callbacks=[checkpointer, LearningRateMonitor()],
+        callbacks=[checkpointer, LearningRateMonitor(logging_interval="step")],
         logger=[tensorboard_logger],
         default_root_dir="logs",
     )
 
     # train loop
     trainer.fit(cycle_gan, dm,
-                ckpt_path=restore_training_from_checkpoint if restore_training_from_checkpoint != "" else None)
+                ckpt_path=restore_training_from_checkpoint if restore_training_from_checkpoint != "/" else None)
 
 
 if __name__ == "__main__":
