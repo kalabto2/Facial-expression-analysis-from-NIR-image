@@ -35,7 +35,8 @@ class OuluCasiaDataset(Dataset):
                 self.data_filepaths.extend(matching_filepaths)
 
         if not on_the_fly:
-            self.data = [Image.open(filepath).convert("RGB") for filepath in self.data_filepaths]
+            self.data = [Image.open(filepath).convert("RGB" if self.split == "VL" else "L")
+                         for filepath in self.data_filepaths]
 
             if self.transform is not None:
                 self.data = [self.transform(i) for i in self.data]
@@ -53,7 +54,7 @@ class OuluCasiaDataset(Dataset):
             return self.data[idx]
         else:
             filepath = self.data_filepaths[idx]
-            image = Image.open(filepath).convert("RGB")
+            image = Image.open(filepath).convert("RGB" if self.split == "VL" else "L")
 
         # transforms to Tensor and other
         if self.transform is not None:
@@ -78,7 +79,7 @@ class OuluCasiaDataModule(pl.LightningDataModule):
             # TODO Add more transformations as needed
         ])
 
-        # TODO get rid of hard fixed data?
+        # TODO get rid of hard fixed data - of light types?
         self.vl_dataset = OuluCasiaDataset(self.data_dir, split="VL", transform=transform, lights={"Strong"})
         self.ni_dataset = OuluCasiaDataset(self.data_dir, split="NI", transform=transform, lights={"Strong"})
 

@@ -83,7 +83,7 @@ def main(
     dm = OuluCasiaDataModule(str(data_folder), batch_size, num_workers=num_workers)
 
     # build model
-    cycle_gan = CycleGAN(3, 3, n_residual_blocks=n_residual_blocks,
+    cycle_gan = CycleGAN(3, 1, n_residual_blocks=n_residual_blocks,
                          lr=learning_rate,
                          beta1=beta1,
                          lambda_idt=lambda_idt,

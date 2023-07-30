@@ -4,6 +4,8 @@ import lightning.pytorch as l
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torchvision.utils import make_grid
 
+from skeleton.models.utils import grayscale_to_rgb
+
 
 class Generator(nn.Module):
     def __init__(self, input_nc, output_nc,
@@ -322,5 +324,6 @@ class CycleGAN(l.LightningModule):
 
         # log images
         if self.global_step % (4 * self.hparams.log_nth_image) == 0:
-            grid = make_grid([real_x[0], fake_y[0], rec_x[0], real_y[0], fake_x[0], rec_y[0]], nrow=3)
+            grid = make_grid([real_x[0], grayscale_to_rgb(fake_y[0]), rec_x[0],
+                              grayscale_to_rgb(real_y[0]), fake_x[0], grayscale_to_rgb(rec_y[0])], nrow=3)
             self.logger.experiment.add_image("generated_images", grid, self.global_step / 4)
