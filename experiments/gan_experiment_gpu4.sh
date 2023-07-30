@@ -1,9 +1,12 @@
 #! /bin/bash
 
-source ../venv/bin/activate
+# Compared to experiment 1 changed:
+# * on new architector - NIR image from 3 channels to 1
+# * learning_rate=9e-5
+# * lambda_cycle=8
 
 # ================= PARAMETERS =================
-log_nth_image=1
+log_nth_image=1000
 
 # ----------------  Data -----------------------
 data_folder="../data/B_OriginalImg"
@@ -12,22 +15,22 @@ batch_size=1
 # ---------------- Training --------------------
 epochs=30
 restore_training_from_checkpoint="/" # '/' stands for no restore, else specify path
-num_workers=4
-use_gpu=0
+num_workers=2
+use_gpu=1
 random_seed=1337
 
 # ------------- Architecture -------------------
 n_residual_blocks=6
 lambda_idt=0
-lambda_cycle=6
+lambda_cycle=8
 
 # ------------- Optimization -------------------
 train_optim="Adam"
-learning_rate=2e-4
+learning_rate=9e-5
 beta1=0.5
-scheduler_enabled=1
-scheduler_step_freq=1
-scheduler_n_steps=8
+scheduler_enabled=0
+scheduler_step_freq=40
+scheduler_n_steps=1000
 scheduler_eta_min=2e-5
 # ==============================================
 
