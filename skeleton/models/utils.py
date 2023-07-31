@@ -7,4 +7,7 @@ def grayscale_to_rgb(grayscale_image):
     for i in range(3):
         rgb_image[i] = grayscale_image
 
+    if grayscale_image.is_cuda:
+        rgb_image = rgb_image.cuda()
+
     return rgb_image
