@@ -127,7 +127,7 @@ class ResidualBlock(nn.Module):
 class CycleGAN(l.LightningModule):
     def __init__(self, input_nc, output_nc, n_residual_blocks=6, lr=0.0002, beta1=0.5, lambda_idt=0.5, lambda_cycle=5,
                  image_shape=(240, 320), log_nth_image=100, scheduler_step_freq=10, scheduler_enabled=False,
-                 scheduler_n_steps=500, scheduler_eta_min=2e-5):
+                 scheduler_n_steps=500, scheduler_eta_min=2e-5, weights_init_std=0.02):
         super(CycleGAN, self).__init__()
 
         # saves all arguments of __init__() as hyperparameters
