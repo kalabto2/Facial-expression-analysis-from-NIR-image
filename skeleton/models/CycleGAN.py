@@ -3,6 +3,7 @@ import torch.nn as nn
 import lightning.pytorch as l
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
 from torchvision.utils import make_grid
+from torch.nn import init
 
 from skeleton.models.utils import grayscale_to_rgb
 
@@ -147,8 +148,43 @@ class CycleGAN(l.LightningModule):
         # set automatic optimization to false since we are using multiple optimizers for each model
         self.automatic_optimization = False
 
+        # initialize weights
+        self.var_init(self.generator_g2f, std=self.hparams.weights_init_std)
+        self.var_init(self.generator_f2g, std=self.hparams.weights_init_std)
+        self.var_init(self.discriminator_x, std=self.hparams.weights_init_std)
+        self.var_init(self.discriminator_y, std=self.hparams.weights_init_std)
+        # visualize_activations(model, print_variance=True) # TODO add visualization?
+
     def forward(self, x):
         return self.generator_g2f(x)
+
+    def var_init(self, model, std=0.02):
+        for name, param in model.named_parameters():
+            param.data.normal_(mean=0.0, std=std)
+
+    # def init_weights(self, net, init_type='normal', std=0.02):
+    #     def init_func(m):  # define the initialization function
+    #         classname = m.__class__.__name__
+    #         if hasattr(m, 'weight') and (classname.find('Conv') != -1 or classname.find('Linear') != -1):
+    #             if init_type == 'normal':
+    #                 init.normal_(m.weight.data, 0.0, std)
+    #             elif init_type == 'xavier':
+    #                 init.xavier_normal_(m.weight.data, gain=std)
+    #             elif init_type == 'kaiming':
+    #                 init.kaiming_normal_(m.weight.data, a=0, mode='fan_in')
+    #             elif init_type == 'orthogonal':
+    #                 init.orthogonal_(m.weight.data, gain=std)
+    #             else:
+    #                 raise NotImplementedError('initialization method [%s] is not implemented' % init_type)
+    #             if hasattr(m, 'bias') and m.bias is not None:
+    #                 init.constant_(m.bias.data, 0.0)
+    #         elif classname.find(
+    #                 'BatchNorm2d') != -1:  # BatchNorm Layer's weight is not a matrix; only normal distribution applies.
+    #             init.normal_(m.weight.data, 1.0, std)
+    #             init.constant_(m.bias.data, 0.0)
+    #
+    #     print('initialize network with %s' % init_type)
+    #     net.apply(init_func)  # apply the initialization function <init_func>
 
     def configure_optimizers(self):
         optimizer_g = torch.optim.Adam(self.generator_g2f.parameters(), lr=self.hparams.lr,
@@ -274,7 +310,7 @@ class CycleGAN(l.LightningModule):
         # calculate loss
         d_x_loss_real = self.discriminator_loss(x_dis_real, torch.ones_like(x_dis_real))
         d_x_loss_fake = self.discriminator_loss(x_dis_fake, torch.zeros_like(x_dis_fake))
-        d_x_loss = d_x_loss_real + d_x_loss_fake
+        d_x_loss = d_x_loss_real + d_x_loss_fake  # TODO add some multiplicative constant?
 
         # backpropagate the loss
         self.backpropagate_loss(optimizer_d_x, d_x_loss, "d_x_loss")
@@ -304,7 +340,7 @@ class CycleGAN(l.LightningModule):
         # calculate the loss
         d_y_loss_real = self.discriminator_loss(y_dis_real, torch.ones_like(y_dis_real))
         d_y_loss_fake = self.discriminator_loss(y_dis_fake, torch.zeros_like(y_dis_fake))
-        d_y_loss = d_y_loss_real + d_y_loss_fake
+        d_y_loss = d_y_loss_real + d_y_loss_fake  # TODO add some multiplicative constant?
 
         # backpropagate the loss
         self.backpropagate_loss(optimizer_d_y, d_y_loss, "d_y_loss")

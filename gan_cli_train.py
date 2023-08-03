@@ -36,6 +36,7 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--scheduler_step_freq", type=int, default=10, help="TBD")
 @click.option("--scheduler_n_steps", type=int, default=100, help="TBD")
 @click.option("--scheduler_eta_min", type=float, default=2e-5, help="TBD")
+@click.option("--weights_init_std", type=float, default=0.02, help="TBD")
 def main(
         data_folder: pathlib.Path,
         batch_size: int,
@@ -54,7 +55,8 @@ def main(
         scheduler_enabled: bool,
         scheduler_step_freq: int,
         scheduler_n_steps: int,
-        scheduler_eta_min: float
+        scheduler_eta_min: float,
+        weights_init_std: float
 ):
     # log input
     print("### input arguments ###")
@@ -75,6 +77,7 @@ def main(
     print(f"scheduler_step_freq={scheduler_step_freq}")
     print(f"scheduler_n_steps={scheduler_n_steps}")
     print(f"scheduler_eta_min={scheduler_eta_min}")
+    print(f"weights_init_std={weights_init_std}")
 
     # set random seed
     seed_everything(random_seed)
@@ -94,6 +97,7 @@ def main(
                          scheduler_n_steps=scheduler_n_steps,
                          scheduler_enabled=scheduler_enabled,
                          scheduler_eta_min=scheduler_eta_min,
+                         weights_init_std=weights_init_std,
                          )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
