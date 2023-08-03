@@ -14,13 +14,13 @@ class Generator(nn.Module):
         super(Generator, self).__init__()
 
         # Downsample
-        self.conv1 = nn.Conv2d(input_nc, 64, kernel_size=7, stride=1, padding=3, bias=False)
+        self.conv1 = nn.Conv2d(input_nc, 64, kernel_size=7, stride=1, padding=3, bias=False, padding_mode="reflect")
         self.in1 = nn.InstanceNorm2d(64, affine=True)
         self.relu1 = nn.ReLU(inplace=True)
-        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(64, 128, kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect")
         self.in2 = nn.InstanceNorm2d(128, affine=True)
         self.relu2 = nn.ReLU(inplace=True)
-        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1, bias=False)
+        self.conv3 = nn.Conv2d(128, 256, kernel_size=3, stride=2, padding=1, bias=False, padding_mode="reflect")
         self.in3 = nn.InstanceNorm2d(256, affine=True)
         self.relu3 = nn.ReLU(inplace=True)
 
@@ -28,13 +28,13 @@ class Generator(nn.Module):
         self.residual_blocks = nn.Sequential(*[ResidualBlock(256) for _ in range(n_residual_blocks)])
 
         # Upsample
-        self.conv4 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False)
+        self.conv4 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False, padding_mode="reflect")
         self.in4 = nn.InstanceNorm2d(128, affine=True)
         self.relu4 = nn.ReLU(inplace=True)
-        self.conv5 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False)
+        self.conv5 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False, padding_mode="reflect")
         self.in5 = nn.InstanceNorm2d(64, affine=True)
         self.relu5 = nn.ReLU(inplace=True)
-        self.conv6 = nn.Conv2d(64, output_nc, kernel_size=7, stride=1, padding=3, bias=False)
+        self.conv6 = nn.Conv2d(64, output_nc, kernel_size=7, stride=1, padding=3, bias=False, padding_mode="reflect")
         self.tanh = nn.Tanh()
 
     def forward(self, x):
@@ -127,7 +127,7 @@ class ResidualBlock(nn.Module):
 class CycleGAN(l.LightningModule):
     def __init__(self, input_nc, output_nc, n_residual_blocks=6, lr=0.0002, beta1=0.5, lambda_idt=0.5, lambda_cycle=5,
                  image_shape=(240, 320), log_nth_image=100, scheduler_step_freq=10, scheduler_enabled=False,
-                 scheduler_n_steps=500, scheduler_eta_min=2e-5, weights_init_std=0.02):
+                 scheduler_n_steps=500, scheduler_eta_min=2e-5, weights_init_std=0.02, lambda_discriminator=0.5):
         super(CycleGAN, self).__init__()
 
         # saves all arguments of __init__() as hyperparameters
@@ -310,7 +310,7 @@ class CycleGAN(l.LightningModule):
         # calculate loss
         d_x_loss_real = self.discriminator_loss(x_dis_real, torch.ones_like(x_dis_real))
         d_x_loss_fake = self.discriminator_loss(x_dis_fake, torch.zeros_like(x_dis_fake))
-        d_x_loss = d_x_loss_real + d_x_loss_fake  # TODO add some multiplicative constant?
+        d_x_loss = self.hparams.lambda_discriminator * (d_x_loss_real + d_x_loss_fake)
 
         # backpropagate the loss
         self.backpropagate_loss(optimizer_d_x, d_x_loss, "d_x_loss")
@@ -340,7 +340,7 @@ class CycleGAN(l.LightningModule):
         # calculate the loss
         d_y_loss_real = self.discriminator_loss(y_dis_real, torch.ones_like(y_dis_real))
         d_y_loss_fake = self.discriminator_loss(y_dis_fake, torch.zeros_like(y_dis_fake))
-        d_y_loss = d_y_loss_real + d_y_loss_fake  # TODO add some multiplicative constant?
+        d_y_loss = self.hparams.lambda_discriminator * (d_y_loss_real + d_y_loss_fake)
 
         # backpropagate the loss
         self.backpropagate_loss(optimizer_d_y, d_y_loss, "d_y_loss")
