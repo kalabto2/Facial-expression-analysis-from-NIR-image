@@ -38,6 +38,9 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--scheduler_eta_min", type=float, default=2e-5, help="TBD")
 @click.option("--weights_init_std", type=float, default=0.02, help="TBD")
 @click.option("--lambda_discriminator", ype=float, default=0.5, help="TBD")
+@click.option("--scheduler", type=str, default="linear", help="TBD")
+@click.option("--linear_lr_w_init_lr", type=int, default=5, help="TBD")
+@click.option("--linear_lr_w_decay", type=int, default=5, help="TBD")
 def main(
         data_folder: pathlib.Path,
         batch_size: int,
@@ -59,6 +62,9 @@ def main(
         scheduler_eta_min: float,
         weights_init_std: float,
         lambda_discriminator: float,
+        scheduler: str,
+        linear_lr_w_init_lr: int,
+        linear_lr_w_decay: int
 ):
     # log input
     print("### input arguments ###")
@@ -81,6 +87,9 @@ def main(
     print(f"scheduler_eta_min={scheduler_eta_min}")
     print(f"weights_init_std={weights_init_std}")
     print(f"lambda_discriminator={lambda_discriminator}")
+    print(f"scheduler={scheduler}")
+    print(f"linear_lr_w_init_lr={linear_lr_w_init_lr}")
+    print(f"linear_lr_w_decay={linear_lr_w_decay}")
 
     # set random seed
     seed_everything(random_seed)
@@ -102,6 +111,9 @@ def main(
                          scheduler_eta_min=scheduler_eta_min,
                          weights_init_std=weights_init_std,
                          lambda_discriminator=lambda_discriminator,
+                         scheduler=scheduler,
+                         linear_lr_w_init_lr=linear_lr_w_init_lr,
+                         linear_lr_w_decay=linear_lr_w_decay,
                          )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)

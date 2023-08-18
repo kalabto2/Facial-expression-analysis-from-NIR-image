@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import lightning.pytorch as l
-from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts
+from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, LambdaLR, CosineAnnealingLR
 from torchvision.utils import make_grid
 from torch.nn import init
 
@@ -127,7 +127,8 @@ class ResidualBlock(nn.Module):
 class CycleGAN(l.LightningModule):
     def __init__(self, input_nc, output_nc, n_residual_blocks=6, lr=0.0002, beta1=0.5, lambda_idt=0.5, lambda_cycle=5,
                  image_shape=(240, 320), log_nth_image=100, scheduler_step_freq=10, scheduler_enabled=False,
-                 scheduler_n_steps=500, scheduler_eta_min=2e-5, weights_init_std=0.02, lambda_discriminator=0.5):
+                 scheduler_n_steps=500, scheduler_eta_min=2e-5, weights_init_std=0.02, lambda_discriminator=0.5,
+                 scheduler="linear", linear_lr_w_init_lr=5, linear_lr_w_decay=5):
         super(CycleGAN, self).__init__()
 
         # saves all arguments of __init__() as hyperparameters
@@ -195,18 +196,26 @@ class CycleGAN(l.LightningModule):
                                          betas=(self.hparams.beta1, 0.999))
         optimizer_d_y = torch.optim.Adam(self.discriminator_y.parameters(), lr=self.hparams.lr,
                                          betas=(self.hparams.beta1, 0.999))
+        optimizers = [optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y]
 
-        scheduler_g = CosineAnnealingWarmRestarts(optimizer_g, self.hparams.scheduler_n_steps,
-                                                  eta_min=self.hparams.scheduler_eta_min, verbose=True)
-        scheduler_f = CosineAnnealingWarmRestarts(optimizer_f, self.hparams.scheduler_n_steps,
-                                                  eta_min=2e-5, verbose=True)
-        scheduler_d_x = CosineAnnealingWarmRestarts(optimizer_d_x, self.hparams.scheduler_n_steps,
-                                                    eta_min=2e-5, verbose=True)
-        scheduler_d_y = CosineAnnealingWarmRestarts(optimizer_d_y, self.hparams.scheduler_n_steps,
-                                                    eta_min=2e-5, verbose=True)
+        if self.hparams.scheduler == "linear":
+            def lambda_rule(epoch):
+                lr_l = 1.0 - max(0, epoch - self.hparams.linear_lr_w_init_lr) / \
+                       float(self.hparams.linear_lr_w_decay + 1)
+                return lr_l
 
-        return [optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y], \
-               [scheduler_g, scheduler_f, scheduler_d_x, scheduler_d_y]
+            schedulers = [LambdaLR(optimizer, lr_lambda=lambda_rule) for optimizer in optimizers]
+        elif self.hparams.scheduler == "cos_ann_w_rest":
+            schedulers = [CosineAnnealingWarmRestarts(optimizer, self.hparams.scheduler_n_steps,
+                          eta_min=self.hparams.scheduler_eta_min, verbose=True) for optimizer in optimizers]
+        elif self.hparams.scheduler == "cos_ann":
+            raise Exception("Not implemented")
+            # schedulers = [CosineAnnealingLR(optimizer, self.hparams.scheduler_n_steps,
+            #               eta_min=self.hparams.scheduler_eta_min, verbose=True) for optimizer in optimizers]
+        else:
+            schedulers = []
+
+        return optimizers, schedulers
 
     def backpropagate_loss(self, optimizer, loss, loss_name):
         optimizer.zero_grad()
@@ -231,7 +240,8 @@ class CycleGAN(l.LightningModule):
 
         # get optimizers and schedulers for each model
         optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
-        scheduler_g, scheduler_f, scheduler_d_x, scheduler_d_y = self.lr_schedulers()
+        if self.hparams.scheduler_enabled:
+            scheduler_g, scheduler_f, scheduler_d_x, scheduler_d_y = self.lr_schedulers()
 
         # ================== BACKPROPAGATE ==================
         # ---------------- TRAIN GENERATOR G ----------------
