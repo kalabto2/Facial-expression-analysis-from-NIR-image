@@ -3,8 +3,8 @@ import torch.nn as nn
 import lightning.pytorch as l
 from torch.optim.lr_scheduler import CosineAnnealingWarmRestarts, LambdaLR, CosineAnnealingLR
 from torchvision.utils import make_grid
-from torch.nn import init
 
+from skeleton.models.Evaluation import ImageEvaluator
 from skeleton.models.utils import grayscale_to_rgb
 
 
@@ -150,16 +150,16 @@ class CycleGAN(l.LightningModule):
         self.automatic_optimization = False
 
         # initialize weights
-        self.var_init(self.generator_g2f, std=self.hparams.weights_init_std)
-        self.var_init(self.generator_f2g, std=self.hparams.weights_init_std)
-        self.var_init(self.discriminator_x, std=self.hparams.weights_init_std)
-        self.var_init(self.discriminator_y, std=self.hparams.weights_init_std)
+        self.weights_init(self.generator_g2f, std=self.hparams.weights_init_std)
+        self.weights_init(self.generator_f2g, std=self.hparams.weights_init_std)
+        self.weights_init(self.discriminator_x, std=self.hparams.weights_init_std)
+        self.weights_init(self.discriminator_y, std=self.hparams.weights_init_std)
         # visualize_activations(model, print_variance=True) # TODO add visualization?
 
     def forward(self, x):
         return self.generator_g2f(x)
 
-    def var_init(self, model, std=0.02):
+    def weights_init(self, model, std=0.02):
         for name, param in model.named_parameters():
             param.data.normal_(mean=0.0, std=std)
 
@@ -373,3 +373,21 @@ class CycleGAN(l.LightningModule):
             grid = make_grid([real_x[0], grayscale_to_rgb(fake_y[0]), rec_x[0],
                               grayscale_to_rgb(real_y[0]), fake_x[0], grayscale_to_rgb(rec_y[0])], nrow=3)
             self.logger.experiment.add_image("generated_images", grid, self.global_step / 4)
+
+    def test_step(self, batch, batch_idx):
+        x, y = batch
+
+        # generate output
+        out = self.forward(x)
+
+        # calculate evaluation metrics
+        image_evaluator = ImageEvaluator(out, y)
+        eval_metrics = image_evaluator(test_prefix=True)
+
+        # log evaluation metrics
+        self.log_dict(eval_metrics)
+
+        # log images
+        if self.global_step % 100 == 0:
+            grid = make_grid([grayscale_to_rgb(x[0]), y[0], out[0]], nrow=3)
+            self.logger.experiment.add_image("test_generated_images", grid, self.global_step / 4)
