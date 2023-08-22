@@ -1,5 +1,7 @@
 import gc
+import json
 import os
+import pathlib
 import re
 import time
 from typing import List, Set, Optional
@@ -11,28 +13,22 @@ from torchvision import transforms
 
 
 class OuluCasiaDataset(Dataset):
-    def __init__(self, root_dir: str, split: str = "VL",
+    def __init__(self, split: str = "VL",
                  transform: Optional[transforms.Compose] = None,
-                 lights: Optional[Set[str]] = "Strong", on_the_fly: bool = True):
+                 on_the_fly: bool = True,
+                 from_split_fp: Optional[List[pathlib.Path]] = None):
         start = time.time()
 
+        # asserts
         assert split == "VL" or split == "NI", f"invalid split value: {split}"
-        assert len(lights - {"Strong", "Dark", "Weak"}) == 0, f"invalid light value in {lights}"
 
-        self.root_dir: str = root_dir
         self.split: str = split
         self.transform: Optional[transforms.Compose] = transform
         self.on_the_fly: bool = on_the_fly
-        self.light: Optional[Set[str]] = lights
+        self.from_split_fp: Optional[List[pathlib.Path]] = from_split_fp
 
         # retrieve VL data filepaths
-        self.data_filepaths: List[str] = []
-        file_pattern = r"\d{3}\.jpeg"
-        for light in lights:
-            for root, directories, filenames in os.walk(os.path.join(self.root_dir, split, light)):
-                matching_filepaths = [os.path.join(root, filename) for filename in filenames if
-                                      re.match(file_pattern, filename)]
-                self.data_filepaths.extend(matching_filepaths)
+        self.data_filepaths = from_split_fp
 
         if not on_the_fly:
             self.data = [Image.open(filepath).convert("RGB" if self.split == "VL" else "L")
@@ -64,28 +60,60 @@ class OuluCasiaDataset(Dataset):
 
 
 class OuluCasiaDataModule(pl.LightningDataModule):
-    def __init__(self, data_dir: str, batch_size: int, num_workers: int = 2):
+    def __init__(self, batch_size: int = 1, num_workers: int = 2, train_split_fp: pathlib.Path = None,
+                 test_split_fp: pathlib.Path = None, shuffle: bool = True):
         super().__init__()
-        self.image_shape = (240, 320)  # TODO un-hardcode?
-        self.ni_dataset = None
-        self.vl_dataset = None
-        self.data_dir = data_dir
+        self.image_shape = None  # (240, 320) are the original images
+        self.test_vl_dataset = None
+        self.train_vl_dataset = None
+        self.test_ni_dataset = None
+        self.train_ni_dataset = None
+
         self.batch_size = batch_size
         self.num_workers = num_workers
+        self.shuffle = shuffle
+
+        self.train_split = None
+        self.test_split = None
+        if train_split_fp:
+            with open(train_split_fp, "r") as f:
+                self.train_split = json.load(f)
+                self.image_shape = Image.open(self.train_split["vl"][0]).size
+        if test_split_fp:
+            with open(test_split_fp, "r") as f:
+                self.test_split = json.load(f)
+                self.image_shape = Image.open(self.test_split["vl"][0]).size
 
     def setup(self, stage=None):
         transform = transforms.Compose([
             transforms.ToTensor(),
             # TODO Add more transformations as needed
         ])
+        if self.train_split:
+            self.train_vl_dataset = OuluCasiaDataset(split="VL", transform=transform,
+                                                     from_split_fp=self.train_split["vl"])
+            self.train_ni_dataset = OuluCasiaDataset(split="NI", transform=transform,
+                                                     from_split_fp=self.train_split["ni"])
 
-        # TODO get rid of hard fixed data - of light types?
-        self.vl_dataset = OuluCasiaDataset(self.data_dir, split="VL", transform=transform, lights={"Strong"})
-        self.ni_dataset = OuluCasiaDataset(self.data_dir, split="NI", transform=transform, lights={"Strong"})
+        if self.test_split:
+            self.test_vl_dataset = OuluCasiaDataset(split="VL", transform=transform,
+                                                    from_split_fp=self.test_split["vl"])
+            self.test_ni_dataset = OuluCasiaDataset(split="NI", transform=transform,
+                                                    from_split_fp=self.test_split["ni"])
 
     def train_dataloader(self):
-        vl_dataloader = DataLoader(self.vl_dataset, batch_size=self.batch_size, shuffle=True,
+        vl_dataloader = DataLoader(self.train_vl_dataset, batch_size=self.batch_size, shuffle=self.shuffle,
                                    num_workers=self.num_workers)
-        ni_dataloader = DataLoader(self.ni_dataset, batch_size=self.batch_size, shuffle=True,
+        ni_dataloader = DataLoader(self.train_ni_dataset, batch_size=self.batch_size, shuffle=self.shuffle,
+                                   num_workers=self.num_workers)
+        return vl_dataloader, ni_dataloader
+
+    def test_dataloader(self):
+        if not self.test_split:
+            return
+
+        vl_dataloader = DataLoader(self.test_vl_dataset, batch_size=self.batch_size, shuffle=False,
+                                   num_workers=self.num_workers)
+        ni_dataloader = DataLoader(self.test_ni_dataset, batch_size=self.batch_size, shuffle=False,
                                    num_workers=self.num_workers)
         return vl_dataloader, ni_dataloader

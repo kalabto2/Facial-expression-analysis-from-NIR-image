@@ -6,8 +6,9 @@ source ../venv/bin/activate
 log_nth_image=1
 
 # ----------------  Data -----------------------
-data_folder="../data/B_OriginalImg"
 batch_size=1
+shuffle_data=1
+train_split_fp="../splits/preproc_train_split.json"
 
 # ---------------- Training --------------------
 epochs=30
@@ -31,8 +32,7 @@ scheduler_n_steps=8
 scheduler_eta_min=2e-5
 # ==============================================
 
-../gan_cli_train.py --data_folder $data_folder \
-                    --batch_size $batch_size \
+../gan_cli_train.py --batch_size $batch_size \
                     --learning_rate $learning_rate \
                     --train_optim $train_optim \
                     --epochs $epochs \
@@ -48,4 +48,6 @@ scheduler_eta_min=2e-5
                     --scheduler_enabled $scheduler_enabled \
                     --scheduler_step_freq $scheduler_step_freq \
                     --scheduler_n_steps $scheduler_n_steps \
-                    --scheduler_eta_min $scheduler_eta_min
+                    --scheduler_eta_min $scheduler_eta_min \
+                    --shuffle_data $shuffle_data \
+                    --train_split_fp $train_split_fp

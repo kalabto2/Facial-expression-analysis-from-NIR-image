@@ -17,7 +17,7 @@ from skeleton.models.CycleGAN import CycleGAN
 
 
 @click.command()
-@click.option("--data_folder", type=pathlib.Path, required=True, help="path to folder containing data with images")
+@click.option("--train_split_fp", type=pathlib.Path, default=None, help="TBD")
 @click.option("--batch_size", type=int, default=1, help="batch size to use for train and val split")
 @click.option("--learning_rate", type=float, default=2e-4, help="constant learning rate used during training")
 @click.option("--train_optim", type=str, default='Adam', help="optimizer used during training")
@@ -37,12 +37,12 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--scheduler_n_steps", type=int, default=100, help="TBD")
 @click.option("--scheduler_eta_min", type=float, default=2e-5, help="TBD")
 @click.option("--weights_init_std", type=float, default=0.02, help="TBD")
-@click.option("--lambda_discriminator", ype=float, default=0.5, help="TBD")
+@click.option("--lambda_discriminator", type=float, default=0.5, help="TBD")
 @click.option("--scheduler", type=str, default="linear", help="TBD")
 @click.option("--linear_lr_w_init_lr", type=int, default=5, help="TBD")
 @click.option("--linear_lr_w_decay", type=int, default=5, help="TBD")
+@click.option("--shuffle_data", type=bool, default=True, help="TBD")
 def main(
-        data_folder: pathlib.Path,
         batch_size: int,
         learning_rate: float,
         epochs: int,
@@ -64,7 +64,9 @@ def main(
         lambda_discriminator: float,
         scheduler: str,
         linear_lr_w_init_lr: int,
-        linear_lr_w_decay: int
+        linear_lr_w_decay: int,
+        shuffle_data: bool,
+        train_split_fp: pathlib.Path,
 ):
     # log input
     print("### input arguments ###")
@@ -90,12 +92,15 @@ def main(
     print(f"scheduler={scheduler}")
     print(f"linear_lr_w_init_lr={linear_lr_w_init_lr}")
     print(f"linear_lr_w_decay={linear_lr_w_decay}")
+    print(f"shuffle_data={shuffle_data}")
+    print(f"train_split_fp={train_split_fp}")
 
     # set random seed
     seed_everything(random_seed)
 
     # build data loader module
-    dm = OuluCasiaDataModule(str(data_folder), batch_size, num_workers=num_workers)
+    dm = OuluCasiaDataModule(batch_size, num_workers=num_workers, train_split_fp=train_split_fp,
+                             shuffle=shuffle_data)
 
     # build model
     cycle_gan = CycleGAN(3, 1, n_residual_blocks=n_residual_blocks,
@@ -118,10 +123,14 @@ def main(
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
 
-    # initialize Logger
-    version = datetime.now().strftime("version_%Y_%m_%d___%H_%M_%S")
-    tensorboard_logger = TensorBoardLogger(save_dir="logs/", version=version, name="CycleGAN_model_logger")
-    # csv_logger = CSVLogger(save_dir="logs/", version=version) # TODO what with this logger?
+    if restore_training_from_checkpoint == "/":
+        # initialize Logger
+        version = datetime.now().strftime("version_%Y_%m_%d___%H_%M_%S")
+        tensorboard_logger = TensorBoardLogger(save_dir="logs/", version=version, name="CycleGAN_model_logger")
+    else:
+        # initialize Logger
+        version = restore_training_from_checkpoint.split("/")[-2]
+        tensorboard_logger = TensorBoardLogger(save_dir="logs/", version=version, name="CycleGAN_model_logger")
 
     # initialize Trainer
     trainer = Trainer(

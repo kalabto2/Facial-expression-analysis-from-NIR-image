@@ -28,13 +28,13 @@ class Generator(nn.Module):
         self.residual_blocks = nn.Sequential(*[ResidualBlock(256) for _ in range(n_residual_blocks)])
 
         # Upsample
-        self.conv4 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False, padding_mode="reflect")
+        self.conv4 = nn.ConvTranspose2d(256, 128, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False)
         self.in4 = nn.InstanceNorm2d(128, affine=True)
         self.relu4 = nn.ReLU(inplace=True)
-        self.conv5 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False, padding_mode="reflect")
+        self.conv5 = nn.ConvTranspose2d(128, 64, kernel_size=3, stride=2, padding=1, output_padding=1, bias=False)
         self.in5 = nn.InstanceNorm2d(64, affine=True)
         self.relu5 = nn.ReLU(inplace=True)
-        self.conv6 = nn.Conv2d(64, output_nc, kernel_size=7, stride=1, padding=3, bias=False, padding_mode="reflect")
+        self.conv6 = nn.Conv2d(64, output_nc, kernel_size=7, stride=1, padding=3, bias=False)
         self.tanh = nn.Tanh()
 
     def forward(self, x):
