@@ -9,7 +9,8 @@ from deepface import DeepFace
 
 class FacePreprocessor:
     def __init__(self, train_split_pth, test_split_pth, new_train_vl_pth, new_train_ni_pth,
-                 new_test_vl_pth, new_test_ni_pth, detector_backend, target_size):
+                 new_test_vl_pth, new_test_ni_pth, detector_backend, target_size, new_train_split=None,
+                 new_test_split=None):
         self.train_split_pth = train_split_pth
         self.test_split_pth = test_split_pth
         self.new_train_vl_pth = new_train_vl_pth
@@ -18,6 +19,8 @@ class FacePreprocessor:
         self.new_test_ni_pth = new_test_ni_pth
         self.detector_backend = detector_backend
         self.target_size = target_size
+        self.new_train_split = new_train_split
+        self.new_test_split = new_test_split
 
         print(train_split_pth)
 
@@ -44,8 +47,9 @@ class FacePreprocessor:
 
         # align faces for all images
         i = 0
+        preprocessed_fps = []
         for fp in fps:
-            new_filename = "-".join(pathlib.PurePath(fp).parts[-3:])  # "-".join(fp.split("/")[3:])
+            new_filename = "-".join(pathlib.PurePath(fp).parts[-3:])
             target_path = os.path.join(target_fp, new_filename)
 
             aligned_face = self.detect_and_align_face(fp)
@@ -59,20 +63,33 @@ class FacePreprocessor:
 
             print(f"#{i} {spectra} Stored: {new_filename}")
             i += 1
+            preprocessed_fps.append(target_path)
+
+        return preprocessed_fps
 
     def preprocess_split(self, split_pth, new_vl_path, new_ni_pth):
         with open(split_pth, "r") as f:
             paths = json.load(f)
 
-        self.preprocess_part(paths["vl"], new_vl_path, "vl")
-        self.preprocess_part(paths["ni"], new_ni_pth, "ni")
+        vl_preproc_fps = self.preprocess_part(paths["vl"], new_vl_path, "vl")
+        ni_preproc_fps = self.preprocess_part(paths["ni"], new_ni_pth, "ni")
+
+        return {"vl": vl_preproc_fps, "ni": ni_preproc_fps}
 
     def preprocess(self):
         # preprocess train split
-        self.preprocess_split(self.train_split_pth, self.new_train_vl_pth, self.new_train_ni_pth)
+        train_fps = self.preprocess_split(self.train_split_pth, self.new_train_vl_pth, self.new_train_ni_pth)
+
+        if self.new_train_split:
+            with open(self.new_train_split, "w") as f:
+                json.dump(train_fps, f)
 
         # preprocess test split
-        self.preprocess_split(self.test_split_pth, self.new_test_vl_pth, self.new_test_ni_pth)
+        test_fps = self.preprocess_split(self.test_split_pth, self.new_test_vl_pth, self.new_test_ni_pth)
+
+        if self.new_test_split:
+            with open(self.new_test_split, "w") as f:
+                json.dump(test_fps, f)
 
 
 @click.command()
@@ -82,6 +99,8 @@ class FacePreprocessor:
 @click.option("--new_train_ni_pth", type=pathlib.Path, help="TBD")
 @click.option("--new_test_vl_pth", type=pathlib.Path, help="TBD")
 @click.option("--new_test_ni_pth", type=pathlib.Path, help="TBD")
+@click.option("--new_train_split_pth", type=pathlib.Path, default=None, help="TBD")
+@click.option("--new_test_split_pth", type=pathlib.Path, default=None, help="TBD")
 @click.option("--detector_backend", type=str, default="mtcnn", help="TBD")
 def main(
         train_split_pth: pathlib.Path,
@@ -90,11 +109,14 @@ def main(
         new_train_ni_pth: pathlib.Path,
         new_test_vl_pth: pathlib.Path,
         new_test_ni_pth: pathlib.Path,
-        detector_backend: str
+        detector_backend: str,
+        new_train_split_pth: pathlib.Path,
+        new_test_split_pth: pathlib.Path,
 ):
     target_size = (130, 150)  # TODO parametrize to script??
     preprocessor = FacePreprocessor(train_split_pth, test_split_pth, new_train_vl_pth, new_train_ni_pth,
-                                    new_test_vl_pth, new_test_ni_pth, detector_backend, target_size)
+                                    new_test_vl_pth, new_test_ni_pth, detector_backend, target_size,
+                                    new_train_split_pth, new_test_split_pth)
 
     preprocessor.preprocess()
 
