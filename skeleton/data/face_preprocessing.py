@@ -8,9 +8,19 @@ from deepface import DeepFace
 
 
 class FacePreprocessor:
-    def __init__(self, train_split_pth, test_split_pth, new_train_vl_pth, new_train_ni_pth,
-                 new_test_vl_pth, new_test_ni_pth, detector_backend, target_size, new_train_split=None,
-                 new_test_split=None):
+    def __init__(
+        self,
+        train_split_pth,
+        test_split_pth,
+        new_train_vl_pth,
+        new_train_ni_pth,
+        new_test_vl_pth,
+        new_test_ni_pth,
+        detector_backend,
+        target_size,
+        new_train_split=None,
+        new_test_split=None,
+    ):
         self.train_split_pth = train_split_pth
         self.test_split_pth = test_split_pth
         self.new_train_vl_pth = new_train_vl_pth
@@ -26,9 +36,12 @@ class FacePreprocessor:
 
     def detect_and_align_face(self, image_fp):
         try:
-            face_objs = DeepFace.extract_faces(img_path=image_fp, target_size=self.target_size,
-                                               detector_backend=self.detector_backend,
-                                               enforce_detection=False)
+            face_objs = DeepFace.extract_faces(
+                img_path=image_fp,
+                target_size=self.target_size,
+                detector_backend=self.detector_backend,
+                enforce_detection=False,
+            )
         except Exception as e:
             print(f"ERROR at {image_fp}", e)
             return None
@@ -78,14 +91,18 @@ class FacePreprocessor:
 
     def preprocess(self):
         # preprocess train split
-        train_fps = self.preprocess_split(self.train_split_pth, self.new_train_vl_pth, self.new_train_ni_pth)
+        train_fps = self.preprocess_split(
+            self.train_split_pth, self.new_train_vl_pth, self.new_train_ni_pth
+        )
 
         if self.new_train_split:
             with open(self.new_train_split, "w") as f:
                 json.dump(train_fps, f)
 
         # preprocess test split
-        test_fps = self.preprocess_split(self.test_split_pth, self.new_test_vl_pth, self.new_test_ni_pth)
+        test_fps = self.preprocess_split(
+            self.test_split_pth, self.new_test_vl_pth, self.new_test_ni_pth
+        )
 
         if self.new_test_split:
             with open(self.new_test_split, "w") as f:
@@ -102,21 +119,42 @@ class FacePreprocessor:
 @click.option("--new_train_split_pth", type=pathlib.Path, default=None, help="TBD")
 @click.option("--new_test_split_pth", type=pathlib.Path, default=None, help="TBD")
 @click.option("--detector_backend", type=str, default="mtcnn", help="TBD")
+@click.option("--target_size", nargs=2, type=click.Tuple([int, int]))
 def main(
-        train_split_pth: pathlib.Path,
-        test_split_pth: pathlib.Path,
-        new_train_vl_pth: pathlib.Path,
-        new_train_ni_pth: pathlib.Path,
-        new_test_vl_pth: pathlib.Path,
-        new_test_ni_pth: pathlib.Path,
-        detector_backend: str,
-        new_train_split_pth: pathlib.Path,
-        new_test_split_pth: pathlib.Path,
+    train_split_pth: pathlib.Path,
+    test_split_pth: pathlib.Path,
+    new_train_vl_pth: pathlib.Path,
+    new_train_ni_pth: pathlib.Path,
+    new_test_vl_pth: pathlib.Path,
+    new_test_ni_pth: pathlib.Path,
+    detector_backend: str,
+    new_train_split_pth: pathlib.Path,
+    new_test_split_pth: pathlib.Path,
+    target_size: tuple,
 ):
-    target_size = (130, 150)  # TODO parametrize to script??
-    preprocessor = FacePreprocessor(train_split_pth, test_split_pth, new_train_vl_pth, new_train_ni_pth,
-                                    new_test_vl_pth, new_test_ni_pth, detector_backend, target_size,
-                                    new_train_split_pth, new_test_split_pth)
+    print("train_split_pth", train_split_pth)
+    print("test_split_pth", test_split_pth)
+    print("new_train_vl_pth", new_train_vl_pth)
+    print("new_train_ni_pth", new_train_ni_pth)
+    print("new_test_vl_pth", new_test_vl_pth)
+    print("new_test_ni_pth", new_test_ni_pth)
+    print("detector_backend", detector_backend)
+    print("new_train_split_pth", new_train_split_pth)
+    print("new_test_split_pth", new_test_split_pth)
+    print("target_size", target_size)
+
+    preprocessor = FacePreprocessor(
+        train_split_pth,
+        test_split_pth,
+        new_train_vl_pth,
+        new_train_ni_pth,
+        new_test_vl_pth,
+        new_test_ni_pth,
+        detector_backend,
+        target_size,
+        new_train_split_pth,
+        new_test_split_pth,
+    )
 
     preprocessor.preprocess()
 
