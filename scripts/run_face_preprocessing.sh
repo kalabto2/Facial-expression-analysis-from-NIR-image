@@ -10,9 +10,9 @@ echo "PROJECT_HOME directory: $PROJECT_HOME"
 
 
 # ================= SPLIT PATHS =================
-train_split_pth=$PROJECT_HOME"splits/train_split.json"
-test_split_pth=$PROJECT_HOME"splits/test_split.json"
-val_split_pth=$PROJECT_HOME"splits/val_split.json"
+train_split_pth=$PROJECT_HOME"splits/train_split_D.json"
+test_split_pth=$PROJECT_HOME"splits/test_split_D.json"
+val_split_pth=$PROJECT_HOME"splits/val_split_D.json"
 
 # ================= NEW DATA PATHS =================
 new_train_vl_pth=$PROJECT_HOME"data/D_PreprocImg/VL/Strong/train"
@@ -32,7 +32,7 @@ detector_backend="retinaface"
 
 python3 $PROJECT_HOME'skeleton/data/face_preprocessing.py' --train_split_pth $train_split_pth \
                                               --test_split_pth $test_split_pth \
-                                              --val_split_pth val_split_pth \
+                                              --val_split_pth $val_split_pth \
                                               --new_train_vl_pth $new_train_vl_pth \
                                               --new_train_ni_pth $new_train_ni_pth \
                                               --new_test_vl_pth $new_test_vl_pth \
