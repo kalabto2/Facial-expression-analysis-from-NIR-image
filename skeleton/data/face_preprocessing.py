@@ -12,27 +12,33 @@ class FacePreprocessor:
         self,
         train_split_pth,
         test_split_pth,
+        val_split_pth,
         new_train_vl_pth,
         new_train_ni_pth,
         new_test_vl_pth,
         new_test_ni_pth,
+        new_val_ni_pth,
+        new_val_vl_pth,
         detector_backend,
         target_size,
-        new_train_split=None,
-        new_test_split=None,
+        new_train_split_pth=None,
+        new_test_split_pth=None,
+        new_val_split_pth=None,
     ):
         self.train_split_pth = train_split_pth
         self.test_split_pth = test_split_pth
+        self.val_split_pth = val_split_pth
         self.new_train_vl_pth = new_train_vl_pth
         self.new_train_ni_pth = new_train_ni_pth
         self.new_test_vl_pth = new_test_vl_pth
         self.new_test_ni_pth = new_test_ni_pth
+        self.new_val_ni_pth = new_val_ni_pth
+        self.new_val_vl_pth = new_val_vl_pth
         self.detector_backend = detector_backend
         self.target_size = target_size
-        self.new_train_split = new_train_split
-        self.new_test_split = new_test_split
-
-        print(train_split_pth)
+        self.new_train_split = new_train_split_pth
+        self.new_test_split = new_test_split_pth
+        self.new_val_split = new_val_split_pth
 
     def detect_and_align_face(self, image_fp):
         try:
@@ -108,52 +114,69 @@ class FacePreprocessor:
             with open(self.new_test_split, "w") as f:
                 json.dump(test_fps, f)
 
+        # preprocess val split
+        val_fps = self.preprocess_split(
+            self.val_split_pth, self.new_val_vl_pth, self.new_val_ni_pth
+        )
+
+        if self.new_val_split:
+            with open(self.new_val_split, "w") as f:
+                json.dump(val_fps, f)
+
 
 @click.command()
 @click.option("--train_split_pth", type=pathlib.Path, help="TBD")
 @click.option("--test_split_pth", type=pathlib.Path, help="TBD")
+@click.option("--val_split_pth", type=pathlib.Path, help="TBD")
 @click.option("--new_train_vl_pth", type=pathlib.Path, help="TBD")
 @click.option("--new_train_ni_pth", type=pathlib.Path, help="TBD")
 @click.option("--new_test_vl_pth", type=pathlib.Path, help="TBD")
 @click.option("--new_test_ni_pth", type=pathlib.Path, help="TBD")
+@click.option("--new_val_vl_pth", type=pathlib.Path, help="TBD")
+@click.option("--new_val_ni_pth", type=pathlib.Path, help="TBD")
 @click.option("--new_train_split_pth", type=pathlib.Path, default=None, help="TBD")
 @click.option("--new_test_split_pth", type=pathlib.Path, default=None, help="TBD")
+@click.option("--new_val_split_pth", type=pathlib.Path, default=None, help="TBD")
 @click.option("--detector_backend", type=str, default="mtcnn", help="TBD")
 @click.option("--target_size", nargs=2, type=click.Tuple([int, int]))
 def main(
     train_split_pth: pathlib.Path,
     test_split_pth: pathlib.Path,
+    val_split_pth: pathlib.Path,
     new_train_vl_pth: pathlib.Path,
     new_train_ni_pth: pathlib.Path,
     new_test_vl_pth: pathlib.Path,
     new_test_ni_pth: pathlib.Path,
+    new_val_vl_pth: pathlib.Path,
+    new_val_ni_pth: pathlib.Path,
     detector_backend: str,
     new_train_split_pth: pathlib.Path,
     new_test_split_pth: pathlib.Path,
+    new_val_split_pth: pathlib.Path,
     target_size: tuple,
 ):
-    print("train_split_pth", train_split_pth)
-    print("test_split_pth", test_split_pth)
-    print("new_train_vl_pth", new_train_vl_pth)
-    print("new_train_ni_pth", new_train_ni_pth)
-    print("new_test_vl_pth", new_test_vl_pth)
-    print("new_test_ni_pth", new_test_ni_pth)
-    print("detector_backend", detector_backend)
-    print("new_train_split_pth", new_train_split_pth)
-    print("new_test_split_pth", new_test_split_pth)
-    print("target_size", target_size)
+    # Print argument names and their values
+    local_symbols = locals()
+    str_args = ""
+    for arg_name, arg_value in local_symbols.items():
+        str_args += f"'{arg_name}': {arg_value}'\n"
+    print(str_args)
 
     preprocessor = FacePreprocessor(
-        train_split_pth,
-        test_split_pth,
-        new_train_vl_pth,
-        new_train_ni_pth,
-        new_test_vl_pth,
-        new_test_ni_pth,
-        detector_backend,
-        target_size,
-        new_train_split_pth,
-        new_test_split_pth,
+        train_split_pth=train_split_pth,
+        test_split_pth=test_split_pth,
+        val_split_pth=val_split_pth,
+        new_train_vl_pth=new_train_vl_pth,
+        new_train_ni_pth=new_train_ni_pth,
+        new_test_vl_pth=new_test_vl_pth,
+        new_test_ni_pth=new_test_ni_pth,
+        new_val_vl_pth=new_val_vl_pth,
+        new_val_ni_pth=new_val_ni_pth,
+        detector_backend=detector_backend,
+        target_size=target_size,
+        new_train_split_pth=new_train_split_pth,
+        new_test_split_pth=new_test_split_pth,
+        new_val_split_pth=new_val_split_pth,
     )
 
     preprocessor.preprocess()
