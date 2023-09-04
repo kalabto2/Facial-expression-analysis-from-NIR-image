@@ -13,10 +13,13 @@ from torchvision import transforms
 
 
 class OuluCasiaDataset(Dataset):
-    def __init__(self, split: str = "VL",
-                 transform: Optional[transforms.Compose] = None,
-                 on_the_fly: bool = True,
-                 from_split_fp: Optional[List[pathlib.Path]] = None):
+    def __init__(
+        self,
+        split: str = "VL",
+        transform: Optional[transforms.Compose] = None,
+        on_the_fly: bool = True,
+        from_split_fp: Optional[List[pathlib.Path]] = None,
+    ):
         start = time.time()
 
         # asserts
@@ -31,8 +34,10 @@ class OuluCasiaDataset(Dataset):
         self.data_filepaths = from_split_fp
 
         if not on_the_fly:
-            self.data = [Image.open(filepath).convert("RGB" if self.split == "VL" else "L")
-                         for filepath in self.data_filepaths]
+            self.data = [
+                Image.open(filepath).convert("RGB" if self.split == "VL" else "L")
+                for filepath in self.data_filepaths
+            ]
 
             if self.transform is not None:
                 self.data = [self.transform(i) for i in self.data]
@@ -60,14 +65,23 @@ class OuluCasiaDataset(Dataset):
 
 
 class OuluCasiaDataModule(pl.LightningDataModule):
-    def __init__(self, batch_size: int = 1, num_workers: int = 2, train_split_fp: pathlib.Path = None,
-                 test_split_fp: pathlib.Path = None, shuffle: bool = True):
+    def __init__(
+        self,
+        batch_size: int = 1,
+        num_workers: int = 2,
+        train_split_fp: pathlib.Path = None,
+        test_split_fp: pathlib.Path = None,
+        val_split_fp: pathlib.Path = None,
+        shuffle: bool = True,
+    ):
         super().__init__()
         self.image_shape = None  # (240, 320) are the original images
         self.test_vl_dataset = None
         self.train_vl_dataset = None
         self.test_ni_dataset = None
         self.train_ni_dataset = None
+        self.val_vl_dataset = None
+        self.val_ni_dataset = None
 
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -75,6 +89,9 @@ class OuluCasiaDataModule(pl.LightningDataModule):
 
         self.train_split = None
         self.test_split = None
+        self.val_split = None
+
+        # just get the shape of images
         if train_split_fp:
             with open(train_split_fp, "r") as f:
                 self.train_split = json.load(f)
@@ -83,37 +100,86 @@ class OuluCasiaDataModule(pl.LightningDataModule):
             with open(test_split_fp, "r") as f:
                 self.test_split = json.load(f)
                 self.image_shape = Image.open(self.test_split["vl"][0]).size
+        if val_split_fp:
+            with open(val_split_fp, "r") as f:
+                self.val_split = json.load(f)
+                self.image_shape = Image.open(self.val_split["vl"][0]).size
 
     def setup(self, stage=None):
-        transform = transforms.Compose([
-            transforms.ToTensor(),
-            # TODO Add more transformations as needed
-        ])
+        transform = transforms.Compose(
+            [
+                transforms.ToTensor(),
+                # TODO Add more transformations as needed
+            ]
+        )
         if self.train_split:
-            self.train_vl_dataset = OuluCasiaDataset(split="VL", transform=transform,
-                                                     from_split_fp=self.train_split["vl"])
-            self.train_ni_dataset = OuluCasiaDataset(split="NI", transform=transform,
-                                                     from_split_fp=self.train_split["ni"])
+            self.train_vl_dataset = OuluCasiaDataset(
+                split="VL", transform=transform, from_split_fp=self.train_split["vl"]
+            )
+            self.train_ni_dataset = OuluCasiaDataset(
+                split="NI", transform=transform, from_split_fp=self.train_split["ni"]
+            )
 
         if self.test_split:
-            self.test_vl_dataset = OuluCasiaDataset(split="VL", transform=transform,
-                                                    from_split_fp=self.test_split["vl"])
-            self.test_ni_dataset = OuluCasiaDataset(split="NI", transform=transform,
-                                                    from_split_fp=self.test_split["ni"])
+            self.test_vl_dataset = OuluCasiaDataset(
+                split="VL", transform=transform, from_split_fp=self.test_split["vl"]
+            )
+            self.test_ni_dataset = OuluCasiaDataset(
+                split="NI", transform=transform, from_split_fp=self.test_split["ni"]
+            )
+
+        if self.val_split:
+            self.val_vl_dataset = OuluCasiaDataset(
+                split="VL", transform=transform, from_split_fp=self.val_split["vl"]
+            )
+            self.val_ni_dataset = OuluCasiaDataset(
+                split="NI", transform=transform, from_split_fp=self.val_split["ni"]
+            )
 
     def train_dataloader(self):
-        vl_dataloader = DataLoader(self.train_vl_dataset, batch_size=self.batch_size, shuffle=self.shuffle,
-                                   num_workers=self.num_workers)
-        ni_dataloader = DataLoader(self.train_ni_dataset, batch_size=self.batch_size, shuffle=self.shuffle,
-                                   num_workers=self.num_workers)
+        vl_dataloader = DataLoader(
+            self.train_vl_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            num_workers=self.num_workers,
+        )
+        ni_dataloader = DataLoader(
+            self.train_ni_dataset,
+            batch_size=self.batch_size,
+            shuffle=self.shuffle,
+            num_workers=self.num_workers,
+        )
         return vl_dataloader, ni_dataloader
 
     def test_dataloader(self):
         if not self.test_split:
             return
 
-        vl_dataloader = DataLoader(self.test_vl_dataset, batch_size=self.batch_size, shuffle=False,
-                                   num_workers=self.num_workers)
-        ni_dataloader = DataLoader(self.test_ni_dataset, batch_size=self.batch_size, shuffle=False,
-                                   num_workers=self.num_workers)
+        vl_dataloader = DataLoader(
+            self.test_vl_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+        ni_dataloader = DataLoader(
+            self.test_ni_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+        return vl_dataloader, ni_dataloader
+
+    def val_dataloader(self):
+        vl_dataloader = DataLoader(
+            self.val_vl_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
+        ni_dataloader = DataLoader(
+            self.val_ni_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+        )
         return vl_dataloader, ni_dataloader
