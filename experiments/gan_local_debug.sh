@@ -8,7 +8,7 @@ PROJECT_HOME=$(dirname "$script_dir")/
 echo "Path to the script: $script_dir"
 echo "PROJECT_HOME directory: $PROJECT_HOME"
 
-source $PROJECT_HOME"/venv/bin/activate"
+source $PROJECT_HOME"venv/bin/activate"
 
 # ================= PARAMETERS =================
 log_nth_image=1
@@ -41,7 +41,7 @@ scheduler_n_steps=8
 scheduler_eta_min=2e-5
 # ==============================================
 
-../gan_cli_train.py --batch_size $batch_size \
+./gan_cli_train.py --batch_size $batch_size \
                     --learning_rate $learning_rate \
                     --train_optim $train_optim \
                     --epochs $epochs \
