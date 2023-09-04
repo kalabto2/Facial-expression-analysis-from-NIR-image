@@ -45,8 +45,8 @@ weights_init_std=0.02
 
 # ==============================================
 
-./gan_cli_train.py --train_split $train_split \
-                    --val_split $val_split \
+./gan_cli_train.py --train_split_fp $train_split \
+                    --val_split_fp $val_split \
                     --batch_size $batch_size \
                     --learning_rate $learning_rate \
                     --train_optim $train_optim \
