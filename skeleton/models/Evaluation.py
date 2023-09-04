@@ -5,9 +5,10 @@ from skimage.metrics import structural_similarity as ssim
 
 
 class ImageEvaluator:
-    def __init__(self, generated_image, target_image):
+    def __init__(self, generated_image, target_image, split="test"):
         self.generated_image = generated_image
         self.target_image = target_image
+        self.split = split
 
         # define the evaluation metrics
         self.SSIM = None
@@ -59,8 +60,8 @@ class ImageEvaluator:
         self.calculate_SIFT()
         self.calculate_color_distance()
 
-    def get_eval_metrics(self, test_prefix: bool = True):
-        prefix = "test_" if test_prefix else ""
+    def get_eval_metrics(self):
+        prefix = f"{self.split}_"
         return {
             prefix + "SSIM": self.SSIM,
             prefix + "PSNR": self.PSNR,
@@ -69,6 +70,6 @@ class ImageEvaluator:
             prefix + "color_distance": self.color_distance,
         }
 
-    def __call__(self, test_prefix: bool = True):
+    def __call__(self):
         self.setup()
-        return self.get_eval_metrics(test_prefix)
+        return self.get_eval_metrics()
