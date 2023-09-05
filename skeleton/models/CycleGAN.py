@@ -14,9 +14,7 @@ import torch.nn.functional as F
 
 
 class Generator(nn.Module):
-    def __init__(
-        self, input_nc, output_nc, n_residual_blocks=6
-    ):
+    def __init__(self, input_nc, output_nc, n_residual_blocks=6):
         super(Generator, self).__init__()
 
         # Downsample
@@ -29,7 +27,7 @@ class Generator(nn.Module):
             bias=False,
             padding_mode="reflect",
         )
-        self.in1 = nn.InstanceNorm2d(64, affine=True)
+        # self.in1 = nn.InstanceNorm2d(64, affine=True)
         self.relu1 = nn.ReLU(inplace=False)
         self.conv2 = nn.Conv2d(
             64,
@@ -78,7 +76,7 @@ class Generator(nn.Module):
     def forward(self, x):
         # Downsample
         x = self.conv1(x)
-        x = self.in1(x)
+        # x = self.in1(x)
         x = self.relu1(x)
         x = self.conv2(x)
         x = self.in2(x)
@@ -97,7 +95,9 @@ class Generator(nn.Module):
         x = self.conv5(x)
         x = self.in5(x)
         x = self.relu5(x)
-        x = self.conv6(x)  # FIXME this apparently causes the errors - it is an implace operation and changes  to version
+        x = self.conv6(
+            x
+        )  # FIXME this apparently causes the errors - it is an implace operation and changes  to version
         x = self.tanh(x)
 
         return x
@@ -387,7 +387,9 @@ class CycleGAN(l.LightningModule):
             )
             g_cycle_consistency_loss = self.cycle_consistence_loss(rec_x, real_x)
             g_identity_loss = (
-                self.identity_loss(id_y, real_y) if self.hparams.lambda_idt != 0 else torch.tensor(0, dtype=torch.float32)
+                self.identity_loss(id_y, real_y)
+                if self.hparams.lambda_idt != 0
+                else torch.tensor(0, dtype=torch.float32)
             )
             g_loss = (
                 g_adv_loss
@@ -431,7 +433,9 @@ class CycleGAN(l.LightningModule):
             )
             f_cycle_consistency_loss = self.cycle_consistence_loss(rec_y, real_y)
             f_identity_loss = (
-                self.identity_loss(id_x, real_x) if self.hparams.lambda_idt != 0 else torch.tensor(0, dtype=torch.float32)
+                self.identity_loss(id_x, real_x)
+                if self.hparams.lambda_idt != 0
+                else torch.tensor(0, dtype=torch.float32)
             )
             f_loss = (
                 f_adv_loss
@@ -471,11 +475,15 @@ class CycleGAN(l.LightningModule):
             x_dis_fake = self.discriminator_x(fake_x_2)
 
             # calculate loss
-            d_x_loss_real = self.discriminator_loss(x_dis_real, torch.ones_like(x_dis_real))
+            d_x_loss_real = self.discriminator_loss(
+                x_dis_real, torch.ones_like(x_dis_real)
+            )
             d_x_loss_fake = self.discriminator_loss(
                 x_dis_fake, torch.zeros_like(x_dis_fake)
             )
-            d_x_loss = self.hparams.lambda_discriminator * (d_x_loss_real + d_x_loss_fake)
+            d_x_loss = self.hparams.lambda_discriminator * (
+                d_x_loss_real + d_x_loss_fake
+            )
 
             # backpropagate the loss
             self.backpropagate_loss(optimizer_d_x, d_x_loss, "d_x_loss")
@@ -508,11 +516,15 @@ class CycleGAN(l.LightningModule):
             y_dis_fake = self.discriminator_y(fake_y_2)
 
             # calculate the loss
-            d_y_loss_real = self.discriminator_loss(y_dis_real, torch.ones_like(y_dis_real))
+            d_y_loss_real = self.discriminator_loss(
+                y_dis_real, torch.ones_like(y_dis_real)
+            )
             d_y_loss_fake = self.discriminator_loss(
                 y_dis_fake, torch.zeros_like(y_dis_fake)
             )
-            d_y_loss = self.hparams.lambda_discriminator * (d_y_loss_real + d_y_loss_fake)
+            d_y_loss = self.hparams.lambda_discriminator * (
+                d_y_loss_real + d_y_loss_fake
+            )
 
             # backpropagate the loss
             self.backpropagate_loss(optimizer_d_y, d_y_loss, "d_y_loss")
@@ -591,9 +603,7 @@ class CycleGAN(l.LightningModule):
 
         # calculate the loss
         d_loss_real = self.discriminator_loss(dis_real, torch.ones_like(dis_real))
-        d_loss_fake = self.discriminator_loss(
-            dis_fake, torch.zeros_like(dis_fake)
-        )
+        d_loss_fake = self.discriminator_loss(dis_fake, torch.zeros_like(dis_fake))
         d_loss = self.hparams.lambda_discriminator * (d_loss_real + d_loss_fake)
 
         # ------------------- LOG ------------------------------
