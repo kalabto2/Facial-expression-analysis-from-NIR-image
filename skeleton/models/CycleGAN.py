@@ -355,12 +355,8 @@ class CycleGAN(l.LightningModule):
             fake_x = self.generator_f2g(real_y)
 
             # Generate identities if identity loss included
-            if self.hparams.lambda_idt != 0:
-                id_y = self.generator_g2f(real_y)
-                id_x = self.generator_f2g(real_x)
-            else:
-                id_y = 0
-                id_x = 0
+            id_y = self.generator_g2f(real_y) if self.hparams.lambda_idt != 0 else 0
+            id_x = self.generator_f2g(real_x) if self.hparams.lambda_idt != 0 else 0
 
             # get optimizers and schedulers for each model
             optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
