@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import pathlib
 import click
 
@@ -6,17 +8,29 @@ from lightning.pytorch import Trainer
 from skeleton.data.oulu_casia import OuluCasiaDataModule
 from skeleton.models.CycleGAN import CycleGAN
 
+from lightning.pytorch.loggers import TensorBoardLogger
+
 
 @click.command()
 @click.option("--model_checkpoint_fp", type=pathlib.Path, help="TBD")
 @click.option("--model_hparams_fp", type=pathlib.Path, help="TBD")
 @click.option("--test_split_fp", type=pathlib.Path, help="TBD")
+@click.option("--use_gpu", type=bool, help="TBD")
 def main(
     model_checkpoint_fp: pathlib.Path,
     model_hparams_fp: pathlib.Path,
     test_split_fp: pathlib.Path,
-    use_gpu: bool
+    use_gpu: bool,
 ):
+    # Print argument names and their values
+    local_symbols = locals()
+    str_args = ""
+    for arg_name, arg_value in local_symbols.items():
+        str_args += f"'{arg_name}': '{arg_value}'\n"
+    print("=" * 10, "arguments", "=" * 10)
+    print(str_args)
+    print("=" * 31)
+
     model = CycleGAN.load_from_checkpoint(
         checkpoint_path=model_checkpoint_fp,
         hparams_file=model_hparams_fp,
