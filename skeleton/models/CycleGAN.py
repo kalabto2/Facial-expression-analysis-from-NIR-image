@@ -9,7 +9,7 @@ from torch.optim.lr_scheduler import (
 from torchvision.utils import make_grid
 
 from skeleton.models.Evaluation import ImageEvaluator
-from skeleton.models.utils import grayscale_to_rgb
+from skeleton.models.utils import grayscale_to_rgb, ImagePool
 import torch.nn.functional as F
 
 
@@ -254,6 +254,9 @@ class CycleGAN(l.LightningModule):
         self.weights_init(self.discriminator_y, std=self.hparams.weights_init_std)
         # visualize_activations(model, print_variance=True) # TODO add visualization?
 
+        self.fakePoolA = ImagePool()
+        self.fakePoolB = ImagePool()
+
     def forward(self, x):
         return self.generator_g2f(x)
 
@@ -338,18 +341,20 @@ class CycleGAN(l.LightningModule):
 
         return optimizers, schedulers
 
-    def calculate_loss_generator(self, discr, total_cycle_consistency_loss, id, real, gen_id):
+    def calculate_loss_generator(
+        self, discr, total_cycle_consistency_loss, id, real, gen_id
+    ):
         adv_loss = self.adversarial_loss(discr, torch.ones_like(discr))
         id_loss = (
-                self.identity_loss(id, real)
-                if self.hparams.lambda_idt != 0
-                else torch.tensor(0, dtype=torch.float32)
-            )
+            self.identity_loss(id, real)
+            if self.hparams.lambda_idt != 0
+            else torch.tensor(0, dtype=torch.float32)
+        )
         total_loss = (
-                adv_loss
-                + self.hparams.lambda_cycle * total_cycle_consistency_loss
-                + self.hparams.lambda_idt * id_loss
-            )
+            adv_loss
+            + self.hparams.lambda_cycle * total_cycle_consistency_loss
+            + self.hparams.lambda_idt * id_loss
+        )
 
         # log losses
         self.log_dict(
@@ -393,8 +398,12 @@ class CycleGAN(l.LightningModule):
         self.rec_y = self.generator_g2f(self.fake_x)
 
         # Generate identities if identity loss included
-        self.id_y = self.generator_g2f(self.real_y) if self.hparams.lambda_idt != 0 else 0
-        self.id_x = self.generator_f2g(self.real_x) if self.hparams.lambda_idt != 0 else 0
+        self.id_y = (
+            self.generator_g2f(self.real_y) if self.hparams.lambda_idt != 0 else 0
+        )
+        self.id_x = (
+            self.generator_f2g(self.real_x) if self.hparams.lambda_idt != 0 else 0
+        )
 
         # Discriminate fake generated images
         self.discrimined_y = self.discriminator_y(self.fake_y)
@@ -405,13 +414,33 @@ class CycleGAN(l.LightningModule):
         self.discrimined_x_real = self.discriminator_x(self.real_x)
 
     def calculate_losses(self):
-        total_cycle_consistency_loss = (self.cycle_consistence_loss(self.rec_x, self.real_x) +
-                                        self.cycle_consistence_loss(self.rec_y, self.real_y))
+        total_cycle_consistency_loss = self.cycle_consistence_loss(
+            self.rec_x, self.real_x
+        ) + self.cycle_consistence_loss(self.rec_y, self.real_y)
 
-        self.g_loss = self.calculate_loss_generator(self.discrimined_y, total_cycle_consistency_loss, self.id_y, self.real_y, "g")
-        self.f_loss = self.calculate_loss_generator(self.discrimined_x, total_cycle_consistency_loss, self.id_x, self.real_x, "f")
-        self.d_x_loss = self.calculate_loss_discriminator(self.discrimined_x_real, self.discrimined_x, "x")
-        self.d_y_loss = self.calculate_loss_discriminator(self.discrimined_y_real, self.discrimined_y, "y")
+        d_x_disc_fake = self.discriminator_x(self.fakePoolA.query(self.fake_x))
+        d_y_disc_fake = self.discriminator_y(self.fakePoolB.query(self.fake_y))
+
+        self.g_loss = self.calculate_loss_generator(
+            self.discrimined_y,
+            total_cycle_consistency_loss,
+            self.id_y,
+            self.real_y,
+            "g",
+        )
+        self.f_loss = self.calculate_loss_generator(
+            self.discrimined_x,
+            total_cycle_consistency_loss,
+            self.id_x,
+            self.real_x,
+            "f",
+        )
+        self.d_x_loss = self.calculate_loss_discriminator(
+            self.discrimined_x_real, d_x_disc_fake, "x"
+        )
+        self.d_y_loss = self.calculate_loss_discriminator(
+            self.discrimined_y_real, d_y_disc_fake, "y"
+        )
 
     def training_step(self, batch, batch_idx):
         # generate all images, discriminators
@@ -435,7 +464,10 @@ class CycleGAN(l.LightningModule):
         self.toggle_optimizer(optimizer_g)
         optimizer_g.zero_grad()
         self.manual_backward(self.g_loss, retain_graph=True)
-        if self.hparams.scheduler_enabled and batch_idx % self.hparams.scheduler_step_freq == 0:
+        if (
+            self.hparams.scheduler_enabled
+            and batch_idx % self.hparams.scheduler_step_freq == 0
+        ):
             scheduler_g.step()
 
         self.untoggle_optimizer(optimizer_g)
@@ -444,7 +476,10 @@ class CycleGAN(l.LightningModule):
         self.toggle_optimizer(optimizer_f)
         optimizer_f.zero_grad()
         self.manual_backward(self.f_loss, retain_graph=True)
-        if self.hparams.scheduler_enabled and batch_idx % self.hparams.scheduler_step_freq == 0:
+        if (
+            self.hparams.scheduler_enabled
+            and batch_idx % self.hparams.scheduler_step_freq == 0
+        ):
             scheduler_f.step()
         self.untoggle_optimizer(optimizer_f)
 
@@ -452,7 +487,10 @@ class CycleGAN(l.LightningModule):
         self.toggle_optimizer(optimizer_d_x)
         optimizer_d_x.zero_grad()
         self.manual_backward(self.d_x_loss, retain_graph=False)
-        if self.hparams.scheduler_enabled and batch_idx % self.hparams.scheduler_step_freq == 0:
+        if (
+            self.hparams.scheduler_enabled
+            and batch_idx % self.hparams.scheduler_step_freq == 0
+        ):
             scheduler_d_x.step()
 
         self.untoggle_optimizer(optimizer_d_x)
@@ -461,7 +499,10 @@ class CycleGAN(l.LightningModule):
         self.toggle_optimizer(optimizer_d_y)
         optimizer_d_y.zero_grad()
         self.manual_backward(self.d_y_loss, retain_graph=False)
-        if self.hparams.scheduler_enabled and batch_idx % self.hparams.scheduler_step_freq == 0:
+        if (
+            self.hparams.scheduler_enabled
+            and batch_idx % self.hparams.scheduler_step_freq == 0
+        ):
             scheduler_d_y.step()
 
         self.untoggle_optimizer(optimizer_d_y)
@@ -473,7 +514,7 @@ class CycleGAN(l.LightningModule):
         optimizer_d_x.step()
         optimizer_d_y.step()
         # ===================================================
-        
+
         # log images
         if self.global_step % (4 * self.hparams.log_nth_image) == 0:
             grid = make_grid(
@@ -487,7 +528,9 @@ class CycleGAN(l.LightningModule):
                 ],
                 nrow=3,
             )
-            self.logger.experiment.add_image("generated_images", grid, self.global_step / 4)
+            self.logger.experiment.add_image(
+                "generated_images", grid, self.global_step / 4
+            )
 
     def test_step(self, batch, batch_idx):
         x, y = batch
