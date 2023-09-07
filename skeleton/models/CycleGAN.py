@@ -95,9 +95,7 @@ class Generator(nn.Module):
         x = self.conv5(x)
         x = self.in5(x)
         x = self.relu5(x)
-        x = self.conv6(
-            x
-        )  # FIXME this apparently causes the errors - it is an implace operation and changes  to version
+        x = self.conv6(x)
         x = self.tanh(x)
 
         return x
@@ -340,225 +338,156 @@ class CycleGAN(l.LightningModule):
 
         return optimizers, schedulers
 
-    def backpropagate_loss(self, optimizer, loss, loss_name):
-        optimizer.zero_grad()
-        self.manual_backward(loss, retain_graph=True)
-        optimizer.step()
+    def calculate_loss_generator(self, discr, total_cycle_consistency_loss, id, real, gen_id):
+        adv_loss = self.adversarial_loss(discr, torch.ones_like(discr))
+        id_loss = (
+                self.identity_loss(id, real)
+                if self.hparams.lambda_idt != 0
+                else torch.tensor(0, dtype=torch.float32)
+            )
+        total_loss = (
+                adv_loss
+                + self.hparams.lambda_cycle * total_cycle_consistency_loss
+                + self.hparams.lambda_idt * id_loss
+            )
+
+        # log losses
+        self.log_dict(
+            {
+                f"{gen_id}_adv_loss": adv_loss,
+                f"{gen_id}_cycle_consistency_loss": total_cycle_consistency_loss,
+                f"{gen_id}_identity_loss": id_loss,
+                f"{gen_id}_loss": total_loss,
+            }
+        )
+
+        return total_loss
+
+    def calculate_loss_discriminator(self, d_real, d_fake, d_id):
+        # calculate loss
+        d_loss_real = self.discriminator_loss(d_real, torch.ones_like(d_real))
+        d_loss_fake = self.discriminator_loss(d_fake, torch.zeros_like(d_fake))
+        d_loss = self.hparams.lambda_discriminator * (d_loss_real + d_loss_fake)
+
+        # log losses
+        self.log_dict(
+            {
+                f"d_{d_id}_loss_real": d_loss_real,
+                f"d_{d_id}_loss_fake": d_loss_fake,
+                f"d_{d_id}_loss": d_loss,
+            }
+        )
+
+        return d_loss
+
+    def generate(self, batch):
+        # get source and target image
+        self.real_x, self.real_y = batch
+
+        # Generate fake images
+        self.fake_y = self.generator_g2f(self.real_x)
+        self.fake_x = self.generator_f2g(self.real_y)
+
+        # Generate reconstructed image
+        self.rec_x = self.generator_f2g(self.fake_y)
+        self.rec_y = self.generator_g2f(self.fake_x)
+
+        # Generate identities if identity loss included
+        self.id_y = self.generator_g2f(self.real_y) if self.hparams.lambda_idt != 0 else 0
+        self.id_x = self.generator_f2g(self.real_x) if self.hparams.lambda_idt != 0 else 0
+
+        # Discriminate fake generated images
+        self.discrimined_y = self.discriminator_y(self.fake_y)
+        self.discrimined_x = self.discriminator_x(self.fake_x)
+
+        # Discriminate real generated images
+        self.discrimined_y_real = self.discriminator_y(self.real_y)
+        self.discrimined_x_real = self.discriminator_x(self.real_x)
+
+    def calculate_losses(self):
+        total_cycle_consistency_loss = (self.cycle_consistence_loss(self.rec_x, self.real_x) +
+                                        self.cycle_consistence_loss(self.rec_y, self.real_y))
+
+        self.g_loss = self.calculate_loss_generator(self.discrimined_y, total_cycle_consistency_loss, self.id_y, self.real_y, "g")
+        self.f_loss = self.calculate_loss_generator(self.discrimined_x, total_cycle_consistency_loss, self.id_x, self.real_x, "f")
+        self.d_x_loss = self.calculate_loss_discriminator(self.discrimined_x_real, self.discrimined_x, "x")
+        self.d_y_loss = self.calculate_loss_discriminator(self.discrimined_y_real, self.discrimined_y, "y")
 
     def training_step(self, batch, batch_idx):
-        with torch.autograd.set_detect_anomaly(True):
-            # get source and target image
-            real_x, real_y = batch
+        # generate all images, discriminators
+        self.generate(batch)
 
-            # Generate fake images
-            fake_y = self.generator_g2f(real_x)
-            fake_x = self.generator_f2g(real_y)
+        # calculate losses
+        self.calculate_losses()
 
-            # Generate identities if identity loss included
-            id_y = self.generator_g2f(real_y) if self.hparams.lambda_idt != 0 else 0
-            id_x = self.generator_f2g(real_x) if self.hparams.lambda_idt != 0 else 0
+        # get optimizers and schedulers for each model
+        optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
+        if self.hparams.scheduler_enabled:
+            (
+                scheduler_g,
+                scheduler_f,
+                scheduler_d_x,
+                scheduler_d_y,
+            ) = self.lr_schedulers()
 
-            # get optimizers and schedulers for each model
-            optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
-            if self.hparams.scheduler_enabled:
-                (
-                    scheduler_g,
-                    scheduler_f,
-                    scheduler_d_x,
-                    scheduler_d_y,
-                ) = self.lr_schedulers()
+        # ================== BACKPROPAGATE ==================
+        # ---------------- TRAIN GENERATOR G ----------------
+        self.toggle_optimizer(optimizer_g)
+        optimizer_g.zero_grad()
+        self.manual_backward(self.g_loss, retain_graph=True)
+        if self.hparams.scheduler_enabled and batch_idx % self.hparams.scheduler_step_freq == 0:
+            scheduler_g.step()
 
-            # ================== BACKPROPAGATE ==================
-            # ---------------- TRAIN GENERATOR G ----------------
+        self.untoggle_optimizer(optimizer_g)
 
-            self.toggle_optimizer(optimizer_g)
+        # ---------------- TRAIN GENERATOR F ----------------
+        self.toggle_optimizer(optimizer_f)
+        optimizer_f.zero_grad()
+        self.manual_backward(self.f_loss, retain_graph=True)
+        if self.hparams.scheduler_enabled and batch_idx % self.hparams.scheduler_step_freq == 0:
+            scheduler_f.step()
+        self.untoggle_optimizer(optimizer_f)
 
-            # Generate reconstructed image
-            rec_x = self.generator_f2g(fake_y)
+        # ---------------- TRAIN OPTIMIZER DX ----------------
+        self.toggle_optimizer(optimizer_d_x)
+        optimizer_d_x.zero_grad()
+        self.manual_backward(self.d_x_loss, retain_graph=False)
+        if self.hparams.scheduler_enabled and batch_idx % self.hparams.scheduler_step_freq == 0:
+            scheduler_d_x.step()
 
-            # calculate loss
-            discrimined_y = self.discriminator_y(fake_y)
-            g_adv_loss = self.adversarial_loss(
-                discrimined_y, torch.ones_like(discrimined_y)
+        self.untoggle_optimizer(optimizer_d_x)
+
+        # ---------------- TRAIN OPTIMIZER DY ----------------
+        self.toggle_optimizer(optimizer_d_y)
+        optimizer_d_y.zero_grad()
+        self.manual_backward(self.d_y_loss, retain_graph=False)
+        if self.hparams.scheduler_enabled and batch_idx % self.hparams.scheduler_step_freq == 0:
+            scheduler_d_y.step()
+
+        self.untoggle_optimizer(optimizer_d_y)
+        # ===================================================
+
+        # update weights
+        optimizer_f.step()
+        optimizer_g.step()
+        optimizer_d_x.step()
+        optimizer_d_y.step()
+        # ===================================================
+        
+        # log images
+        if self.global_step % (4 * self.hparams.log_nth_image) == 0:
+            grid = make_grid(
+                [
+                    self.real_x[0],
+                    grayscale_to_rgb(self.fake_y[0]),
+                    self.rec_x[0],
+                    grayscale_to_rgb(self.real_y[0]),
+                    self.fake_x[0],
+                    grayscale_to_rgb(self.rec_y[0]),
+                ],
+                nrow=3,
             )
-            g_cycle_consistency_loss = self.cycle_consistence_loss(rec_x, real_x)
-            g_identity_loss = (
-                self.identity_loss(id_y, real_y)
-                if self.hparams.lambda_idt != 0
-                else torch.tensor(0, dtype=torch.float32)
-            )
-            g_loss = (
-                g_adv_loss
-                + self.hparams.lambda_cycle * g_cycle_consistency_loss
-                + self.hparams.lambda_idt * g_identity_loss
-            )
-
-            # print(f"{g_adv_loss} + {self.hparams.lambda_cycle * g_cycle_consistency_loss} + {self.hparams.lambda_idt * g_identity_loss}")
-
-            # backpropagate the loss
-            self.backpropagate_loss(optimizer_g, g_loss, "g_loss")
-
-            if (
-                self.hparams.scheduler_enabled
-                and batch_idx % self.hparams.scheduler_step_freq == 0
-            ):
-                scheduler_g.step()
-
-            self.log_dict(
-                {
-                    "g_adv_loss": g_adv_loss,
-                    "g_cycle_consistency_loss": g_cycle_consistency_loss,
-                    "g_identity_loss": g_identity_loss,
-                    "g_loss": g_loss,
-                }
-            )
-
-            self.untoggle_optimizer(optimizer_g)
-
-            # ---------------- TRAIN GENERATOR F ----------------
-
-            self.toggle_optimizer(optimizer_f)
-
-            # generate reconstructed image
-            rec_y = self.generator_g2f(fake_x)
-
-            # calculate loss
-            discrimined_x = self.discriminator_x(fake_x)
-            f_adv_loss = self.adversarial_loss(
-                discrimined_x, torch.ones_like(discrimined_x)
-            )
-            f_cycle_consistency_loss = self.cycle_consistence_loss(rec_y, real_y)
-            f_identity_loss = (
-                self.identity_loss(id_x, real_x)
-                if self.hparams.lambda_idt != 0
-                else torch.tensor(0, dtype=torch.float32)
-            )
-            f_loss = (
-                f_adv_loss
-                + self.hparams.lambda_cycle * f_cycle_consistency_loss
-                + self.hparams.lambda_idt * f_identity_loss
-            )
-
-            # backpropagate the loss
-            self.backpropagate_loss(optimizer_f, f_loss, "f_loss")
-
-            if (
-                self.hparams.scheduler_enabled
-                and batch_idx % self.hparams.scheduler_step_freq == 0
-            ):
-                scheduler_f.step()
-
-            self.log_dict(
-                {
-                    "f_adv_loss": f_adv_loss,
-                    "f_cycle_consistency_loss": f_cycle_consistency_loss,
-                    "f_identity_loss": f_identity_loss,
-                    "f_loss": f_loss,
-                }
-            )
-
-            self.untoggle_optimizer(optimizer_f)
-
-            # ---------------- TRAIN DISCRIMINATOR X ------------
-
-            self.toggle_optimizer(optimizer_d_x)
-
-            # recalculate for pytorch fixme?
-            fake_x_2 = self.generator_f2g(real_y)
-
-            # discriminate the real and fake images
-            x_dis_real = self.discriminator_x(real_x)
-            x_dis_fake = self.discriminator_x(fake_x_2)
-
-            # calculate loss
-            d_x_loss_real = self.discriminator_loss(
-                x_dis_real, torch.ones_like(x_dis_real)
-            )
-            d_x_loss_fake = self.discriminator_loss(
-                x_dis_fake, torch.zeros_like(x_dis_fake)
-            )
-            d_x_loss = self.hparams.lambda_discriminator * (
-                d_x_loss_real + d_x_loss_fake
-            )
-
-            # backpropagate the loss
-            self.backpropagate_loss(optimizer_d_x, d_x_loss, "d_x_loss")
-
-            if (
-                self.hparams.scheduler_enabled
-                and batch_idx % self.hparams.scheduler_step_freq == 0
-            ):
-                scheduler_d_x.step()
-
-            self.log_dict(
-                {
-                    "d_x_loss_real": d_x_loss_real,
-                    "d_x_loss_fake": d_x_loss_fake,
-                    "d_x_loss": d_x_loss,
-                }
-            )
-
-            self.untoggle_optimizer(optimizer_d_x)
-
-            # ---------------- TRAIN DISCRIMINATOR Y ------------
-
-            self.toggle_optimizer(optimizer_d_y)
-
-            # recalculate for pytorch fixme?
-            fake_y_2 = self.generator_g2f(real_x)
-
-            # discriminate the real and fake images
-            y_dis_real = self.discriminator_y(real_y)
-            y_dis_fake = self.discriminator_y(fake_y_2)
-
-            # calculate the loss
-            d_y_loss_real = self.discriminator_loss(
-                y_dis_real, torch.ones_like(y_dis_real)
-            )
-            d_y_loss_fake = self.discriminator_loss(
-                y_dis_fake, torch.zeros_like(y_dis_fake)
-            )
-            d_y_loss = self.hparams.lambda_discriminator * (
-                d_y_loss_real + d_y_loss_fake
-            )
-
-            # backpropagate the loss
-            self.backpropagate_loss(optimizer_d_y, d_y_loss, "d_y_loss")
-
-            if (
-                self.hparams.scheduler_enabled
-                and batch_idx % self.hparams.scheduler_step_freq == 0
-            ):
-                scheduler_d_y.step()
-
-            self.log_dict(
-                {
-                    "d_y_loss_real": d_y_loss_real,
-                    "d_y_loss_fake": d_y_loss_fake,
-                    "d_y_loss": d_y_loss,
-                }
-            )
-
-            self.untoggle_optimizer(optimizer_d_y)
-
-            # ===================================================
-
-            # log images
-            if self.global_step % (4 * self.hparams.log_nth_image) == 0:
-                grid = make_grid(
-                    [
-                        real_x[0],
-                        grayscale_to_rgb(fake_y[0]),
-                        rec_x[0],
-                        grayscale_to_rgb(real_y[0]),
-                        fake_x[0],
-                        grayscale_to_rgb(rec_y[0]),
-                    ],
-                    nrow=3,
-                )
-                self.logger.experiment.add_image(
-                    "generated_images", grid, self.global_step / 4
-                )
+            self.logger.experiment.add_image("generated_images", grid, self.global_step / 4)
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -610,46 +539,3 @@ class CycleGAN(l.LightningModule):
                 f"val_loss_D{dis_id}_fake": d_loss_fake,
             }
         )
-
-        # return
-        # # get source and target image
-        # real_x, real_y = batch
-        #
-        # fake_y = self.generator_g2f(real_x)
-        # fake_x = self.generator_f2g(real_y)
-        #
-        # # ---------------- VALIDATE DISCRIMINATOR Y ------------
-        # # discriminate the real and fake images
-        # y_dis_real = self.discriminator_y(real_y)
-        # y_dis_fake = self.discriminator_y(fake_y)
-        #
-        # # calculate the loss
-        # d_y_loss_real = self.discriminator_loss(y_dis_real, torch.ones_like(y_dis_real))
-        # d_y_loss_fake = self.discriminator_loss(
-        #     y_dis_fake, torch.zeros_like(y_dis_fake)
-        # )
-        # d_y_loss = self.hparams.lambda_discriminator * (d_y_loss_real + d_y_loss_fake)
-        #
-        # # ---------------- VALIDATE DISCRIMINATOR X ------------
-        # # discriminate the real and fake images
-        # x_dis_real = self.discriminator_x(real_x)
-        # x_dis_fake = self.discriminator_x(fake_x)
-        #
-        # # calculate the loss
-        # d_x_loss_real = self.discriminator_loss(x_dis_real, torch.ones_like(x_dis_real))
-        # d_x_loss_fake = self.discriminator_loss(
-        #     x_dis_fake, torch.zeros_like(x_dis_fake)
-        # )
-        # d_x_loss = self.hparams.lambda_discriminator * (d_x_loss_real + d_x_loss_fake)
-        #
-        # # ------------------- LOG ------------------------------
-        # self.log_dict(
-        #     {
-        #         "val_loss_DY": d_y_loss,
-        #         "val_loss_DY_real": d_y_loss_real,
-        #         "val_loss_DY_fake": d_y_loss_fake,
-        #         "val_loss_DX": d_x_loss,
-        #         "val_loss_DX_real": d_x_loss_real,
-        #         "val_loss_DX_fake": d_x_loss_fake,
-        #     }
-        # )
