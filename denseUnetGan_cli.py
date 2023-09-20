@@ -104,6 +104,7 @@ def main(
         l_color=l_color,
         l_pix=l_pix,
         l_feature=l_feature,
+        log_nth_image=log_nth_image
     )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
