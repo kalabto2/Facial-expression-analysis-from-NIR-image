@@ -9,12 +9,13 @@ echo "Path to the script: $script_dir"
 echo "PROJECT_HOME directory: $PROJECT_HOME"
 
 
-VERSION="E"
+SPLIT_VERSION="D"
+VERSION="F"
 
 # ================= SPLIT PATHS =================
-train_split_pth=$PROJECT_HOME"splits/train_split_D.json"
-test_split_pth=$PROJECT_HOME"splits/test_split_D.json"
-val_split_pth=$PROJECT_HOME"splits/val_split_D.json"
+train_split_pth=$PROJECT_HOME"splits/train_split_"$SPLIT_VERSION".json"
+test_split_pth=$PROJECT_HOME"splits/test_split_"$SPLIT_VERSION".json"
+val_split_pth=$PROJECT_HOME"splits/val_split_"$SPLIT_VERSION".json"
 
 # ================= NEW DATA PATHS =================
 new_train_vl_pth=$PROJECT_HOME"data/"$VERSION"_PreprocImg/VL/Strong/train"
@@ -45,4 +46,4 @@ python3 $PROJECT_HOME'skeleton/data/face_preprocessing.py' --train_split_pth $tr
                                               --new_train_split_pth $new_train_split_pth \
                                               --new_test_split_pth $new_test_split_pth \
                                               --new_val_split_pth $new_val_split_pth \
-                                              --target_size 152 152
+                                              --target_size 256 256
