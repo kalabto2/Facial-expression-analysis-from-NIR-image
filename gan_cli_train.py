@@ -152,13 +152,13 @@ def main(
         # initialize Logger
         version = datetime.now().strftime("version_%Y_%m_%d___%H_%M_%S")
         tensorboard_logger = TensorBoardLogger(
-            save_dir="logs/", version=version, name="CycleGAN_model_logger"
+            save_dir="experiments/logs/", version=version, name="CycleGAN_model_logger"
         )
     else:
         # initialize Logger
         version = restore_training_from_checkpoint.split("/")[-2]
         tensorboard_logger = TensorBoardLogger(
-            save_dir="logs/", version=version, name="CycleGAN_model_logger"
+            save_dir="experiments/logs/", version=version, name="CycleGAN_model_logger"
         )
 
     # initialize Trainer
