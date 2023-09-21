@@ -54,7 +54,7 @@ class DenseUnetGAN(l.LightningModule):
 
         # prepare VGG19 for feature loss
         vgg19_model = models.vgg19(pretrained=True)
-        if device == "cuda":
+        if device == "gpu":
             vgg19_model = vgg19_model.cuda()
 
         transform = transforms.Compose(
