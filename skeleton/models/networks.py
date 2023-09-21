@@ -195,18 +195,28 @@ class ResidualBlock(nn.Module):
         return out
 
 
+def conv_block(in_c, out_c, kernel, stride, padding, up=False):
+    return nn.Sequential(
+        nn.Conv2d(in_c, out_c, kernel, stride, padding)
+        if not up
+        else nn.ConvTranspose2d(in_c, out_c, kernel, stride, padding),
+        nn.LeakyReLU(0.2),
+        nn.InstanceNorm2d(out_c, affine=True),
+    )
+
+
 class DenseBlock(nn.Module):
     def __init__(self):
         super(DenseBlock, self).__init__()
 
         # 512@2x2 -> 32@2x2
-        self.conv1 = nn.Conv2d(512, 32, (2, 2), 2, 1)
+        self.conv1 = conv_block(512, 32, (2, 2), 2, 1)
         # 512@2x2 cat 32@2x2 -> 32@2x2
-        self.conv2 = nn.Conv2d(544, 32, (2, 2), 2, 1)
+        self.conv2 = conv_block(544, 32, (2, 2), 2, 1)
         # 512@2x2 cat 32@2x2 cat 32@2x2 -> 32@2x2
-        self.conv3 = nn.Conv2d(576, 32, (2, 2), 2, 1)
+        self.conv3 = conv_block(576, 32, (2, 2), 2, 1)
         # 512@2x2 cat 32@2x2 cat 32@2x2 cat 32@2x2 -> 32@2x2
-        self.conv4 = nn.Conv2d(608, 32, (2, 2), 2, 1)
+        self.conv4 = conv_block(608, 32, (2, 2), 2, 1)
 
     def forward(self, x):
         c1 = self.conv1(x)
@@ -224,36 +234,36 @@ class DenseUnet(nn.Module):
 
         # -----------DOWNSCALE-----------
         # [in_channels]@256x256 ->64@128x128
-        self.d1 = nn.Conv2d(in_channels, 64, (5, 5), 2, 2)
+        self.d1 = conv_block(in_channels, 64, (5, 5), 2, 2)
         # 64@128x128 -> 128@64x64
-        self.d2 = nn.Conv2d(64, 128, (5, 5), 2, 2)
+        self.d2 = conv_block(64, 128, (5, 5), 2, 2)
         # 128@64x64 -> 256@32x32
-        self.d3 = nn.Conv2d(128, 256, (5, 5), 2, 2)
+        self.d3 = conv_block(128, 256, (5, 5), 2, 2)
         # 256@32x32 -> 512@16x16
-        self.d4 = nn.Conv2d(256, 512, (5, 5), 2, 2)
+        self.d4 = conv_block(256, 512, (5, 5), 2, 2)
         # 512@16x16 -> 512@8x8
-        self.d5 = nn.Conv2d(512, 512, (5, 5), 2, 2)
+        self.d5 = conv_block(512, 512, (5, 5), 2, 2)
         # 512@8x8 -> 512@4x4
-        self.d6 = nn.Conv2d(512, 512, (5, 5), 2, 2)
+        self.d6 = conv_block(512, 512, (5, 5), 2, 2)
         # 512@4x4 ->512@2x2
-        self.d7 = nn.Conv2d(512, 512, (5, 5), 2, 2)
+        self.d7 = conv_block(512, 512, (5, 5), 2, 2)
 
         # ----------DENSE BLOCK----------
         self.dense_block = DenseBlock()
 
         # ------------UPSCALE------------
         # 512@2x2 cat 640@2x2 -> 512@4x4
-        self.u1 = nn.ConvTranspose2d(1152, 512, (6, 6), 2, padding=2)
+        self.u1 = conv_block(1152, 512, (6, 6), 2, padding=2, up=True)
         # 512@4x4 cat 512@4x4 -> 512@8x8
-        self.u2 = nn.ConvTranspose2d(1024, 512, (6, 6), 2, padding=2)
+        self.u2 = conv_block(1024, 512, (6, 6), 2, padding=2, up=True)
         # 512@8x8 cat 512@8x8 -> 512@16x16
-        self.u3 = nn.ConvTranspose2d(1024, 512, (6, 6), 2, padding=2)
+        self.u3 = conv_block(1024, 512, (6, 6), 2, padding=2, up=True)
         # 512@16x16 cat 512@16x16 -> 256@32x32
-        self.u4 = nn.ConvTranspose2d(1024, 256, (6, 6), 2, padding=2)
+        self.u4 = conv_block(1024, 256, (6, 6), 2, padding=2, up=True)
         # 256@32x32 cat 256@32x32 -> 128@64x64
-        self.u5 = nn.ConvTranspose2d(512, 128, (6, 6), 2, padding=2)
+        self.u5 = conv_block(512, 128, (6, 6), 2, padding=2, up=True)
         # 128@64x64 cat 128@64x64 -> 64@128x128
-        self.u6 = nn.ConvTranspose2d(256, 64, (6, 6), 2, padding=2)
+        self.u6 = conv_block(256, 64, (6, 6), 2, padding=2, up=True)
         # 64@128x128 cat 64@128x128 -> [out_channels]@256x256
         self.u7 = nn.ConvTranspose2d(128, out_channels, (6, 6), 2, padding=2)
 
@@ -289,17 +299,18 @@ class PatchDiscriminatorPaired(nn.Module):
             # ... -> 4@256x256
             nn.AvgPool2d((2, 2), 2),
             # 4@256x256 -> 64@128x128
-            nn.Conv2d(4, 64, (5, 5), 2, 2),
+            conv_block(4, 64, (5, 5), 2, 2),
             # 64@128x128 -> 128@64x64
-            nn.Conv2d(64, 128, (5, 5), 2, 2),
+            conv_block(64, 128, (5, 5), 2, 2),
             # 128@64x64 -> 256@32x32
-            nn.Conv2d(128, 256, (5, 5), 2, 2),
+            conv_block(128, 256, (5, 5), 2, 2),
             # 256@32x32 -> 512@16x16
-            nn.Conv2d(256, 512, (5, 5), 2, 2),
+            conv_block(256, 512, (5, 5), 2, 2),
             # 512@16x16 -> 512@8x8
-            nn.Conv2d(512, 512, (5, 5), 2, 2),
+            conv_block(512, 512, (5, 5), 2, 2),
             # 512@8x8 -> 1@8x8
             nn.Conv2d(512, 1, (5, 5), 1, 2),
+            nn.Sigmoid(),
         )
 
     def forward(self, x):
