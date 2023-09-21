@@ -168,7 +168,7 @@ def main(
         devices=1,
         callbacks=[checkpointer, LearningRateMonitor(logging_interval="step")],
         logger=[tensorboard_logger],
-        default_root_dir="logs",
+        default_root_dir="experiments/logs",
     )
 
     # train loop

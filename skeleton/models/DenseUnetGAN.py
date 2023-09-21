@@ -27,6 +27,7 @@ class DenseUnetGAN(l.LightningModule):
         l_pix=40,
         l_feature=1.3,
         log_nth_image=100,
+        device="cuda",
     ):
         super(DenseUnetGAN, self).__init__()
 
@@ -53,6 +54,9 @@ class DenseUnetGAN(l.LightningModule):
 
         # prepare VGG19 for feature loss
         vgg19_model = models.vgg19(pretrained=True)
+        if device == "cuda":
+            vgg19_model = vgg19_model.cuda()
+
         transform = transforms.Compose(
             [
                 transforms.Resize((224, 224)),  # Resize to VGG-16 input size
@@ -152,7 +156,9 @@ class DenseUnetGAN(l.LightningModule):
                 ],
                 nrow=3,
             )
-            self.logger.experiment.add_image("generated_images", grid, self.global_step / 2)
+            self.logger.experiment.add_image(
+                "generated_images", grid, self.global_step / 2
+            )
 
     def test_step(self, batch, batch_idx):
         x, y = batch
@@ -168,7 +174,7 @@ class DenseUnetGAN(l.LightningModule):
         self.log_dict(eval_metrics)
 
         # log images
-        if self.global_step % (2*self.hparams.log_nth_image) == 0:
+        if self.global_step % (2 * self.hparams.log_nth_image) == 0:
             grid = make_grid([grayscale_to_rgb(x[0]), y[0], out[0]], nrow=3)
             self.logger.experiment.add_image(
                 "test_generated_images", grid, self.global_step / 4

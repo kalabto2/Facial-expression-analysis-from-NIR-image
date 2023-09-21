@@ -104,7 +104,8 @@ def main(
         l_color=l_color,
         l_pix=l_pix,
         l_feature=l_feature,
-        log_nth_image=log_nth_image
+        log_nth_image=log_nth_image,
+        device="gpu" if use_gpu else "cpu",
     )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
@@ -122,7 +123,7 @@ def main(
         devices=1,
         callbacks=[checkpointer, LearningRateMonitor(logging_interval="step")],
         logger=[tensorboard_logger],
-        default_root_dir="logs",
+        default_root_dir="experiments/logs",
     )
 
     # train loop
