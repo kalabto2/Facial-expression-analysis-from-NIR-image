@@ -180,6 +180,29 @@ class DenseUnetGAN(l.LightningModule):
                 "test_generated_images", grid, self.global_step / 4
             )
 
+        # ------------ TEST DISCRIMINATOR ---------------
+        v_y_fake = self.gen(self.v_x_real)
+        v_disc_y_fake = self.disc((v_y_fake, self.v_x_real))
+        v_disc_y_real = self.disc((self.v_y_real, self.v_x_real))
+
+        # calculate losses for discriminator
+        d_loss_real = self.discriminator_loss(
+            v_disc_y_real, torch.ones_like(v_disc_y_real)
+        )
+        d_loss_fake = self.discriminator_loss(
+            v_disc_y_fake, torch.zeros_like(v_disc_y_fake)
+        )
+        disc_loss = self.hparams.l_disc * (d_loss_real + d_loss_fake)
+
+        # log discriminator's test losses
+        self.log_dict(
+            {
+                "test_disc_loss": disc_loss,
+                "test_disc_real_loss": d_loss_real,
+                "test_disc_fake_loss": d_loss_fake,
+            }
+        )
+
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if dataloader_idx == 0:
             self.v_y_real = batch
