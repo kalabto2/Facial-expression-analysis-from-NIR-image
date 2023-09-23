@@ -15,6 +15,7 @@ from skeleton.models.DenseUnetGAN import DenseUnetGAN
 @click.command()
 @click.option("--train_split_fp", type=pathlib.Path, default=None, help="TBD")
 @click.option("--val_split_fp", type=pathlib.Path, default=None, help="TBD")
+@click.option("--test_split_fp", type=pathlib.Path, default="/", help="TBD")
 @click.option("--batch_size", type=int, default=1, help="TBD")
 @click.option("--learning_rate", type=float, default=2e-4, help="TBD")
 @click.option("--epochs", type=int, default=30, help="number of epochs to train for")
@@ -71,6 +72,7 @@ def main(
     l_color: float,
     l_pix: float,
     l_feature: float,
+    test_split_fp: pathlib.Path,
 ):
     # Print argument names and their values
     local_symbols = locals()
@@ -91,6 +93,7 @@ def main(
         train_split_fp=train_split_fp,
         val_split_fp=val_split_fp,
         shuffle=shuffle_data,
+        test_split_fp=None if test_split_fp == "/" else test_split_fp,
     )
 
     dense_unet = DenseUnetGAN(
@@ -134,6 +137,10 @@ def main(
         if restore_training_from_checkpoint != "/"
         else None,
     )
+
+    # test the model if test split specified
+    if test_split_fp != "/":
+        trainer.test(dense_unet, dm)
 
 
 if __name__ == "__main__":

@@ -160,8 +160,13 @@ class DenseUnetGAN(l.LightningModule):
                 "generated_images", grid, self.global_step / 2
             )
 
-    def test_step(self, batch, batch_idx):
-        y, x = batch
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        if dataloader_idx == 0:
+            self.te_y = batch
+            return
+        else:
+            x = batch
+        y = self.te_y
 
         # generate output
         out = self.forward(x)
@@ -236,3 +241,13 @@ class DenseUnetGAN(l.LightningModule):
                 "val_disc_fake_loss": d_loss_fake,
             }
         )
+
+        # log one image
+        if self.global_step % (2 * 500) == 0:
+            grid = make_grid(
+                [grayscale_to_rgb(self.v_x_real[0]), self.v_y_real[0], v_y_fake[0]],
+                nrow=3,
+            )
+            self.logger.experiment.add_image(
+                "val_generated_images", grid, self.global_step / 4
+            )
