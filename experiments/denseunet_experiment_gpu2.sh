@@ -16,6 +16,7 @@ batch_size=1
 shuffle_data=0
 train_split_fp=$PROJECT_HOME"splits/preproc_train_split_F.json"
 val_split_fp=$PROJECT_HOME"splits/preproc_val_split_F.json"
+test_split_fp=$PROJECT_HOME"splits/preproc_test_split_F.json"  # '/' stands for no testing, else specify path
 
 # ---------------- Training --------------------
 epochs=30
@@ -53,6 +54,7 @@ beta1=0.5
                     --shuffle_data $shuffle_data \
                     --train_split_fp $train_split_fp \
                     --val_split_fp $val_split_fp \
+                    --test_split_fp $test_split_fp \
                     --l_disc $l_disc \
                     --l_color $l_color \
                     --l_pix $l_pix \
