@@ -161,7 +161,7 @@ class DenseUnetGAN(l.LightningModule):
             )
 
     def test_step(self, batch, batch_idx):
-        x, y = batch
+        y, x = batch
 
         # generate output
         out = self.forward(x)
@@ -180,33 +180,36 @@ class DenseUnetGAN(l.LightningModule):
                 "test_generated_images", grid, self.global_step / 4
             )
 
-    # def validation_step(self, batch, batch_idx, dataloader_idx=0):
-    #     if dataloader_idx == 0:
-    #         gen = self.generator_g2f
-    #         dis_a = self.discriminator_y
-    #         dis_b = self.discriminator_x
-    #         dis_id = "Y"
-    #     else:
-    #         gen = self.generator_f2g
-    #         dis_a = self.discriminator_x
-    #         dis_b = self.discriminator_y
-    #         dis_id = "X"
-    #
-    #     real = batch
-    #     fake = gen(real)
-    #     dis_real = dis_b(real)
-    #     dis_fake = dis_a(fake)
-    #
-    #     # calculate the loss
-    #     d_loss_real = self.discriminator_loss(dis_real, torch.ones_like(dis_real))
-    #     d_loss_fake = self.discriminator_loss(dis_fake, torch.zeros_like(dis_fake))
-    #     d_loss = self.hparams.lambda_discriminator * (d_loss_real + d_loss_fake)
-    #
-    #     # ------------------- LOG ------------------------------
-    #     self.log_dict(
-    #         {
-    #             f"val_loss_D{dis_id}": d_loss,
-    #             f"val_loss_D{dis_id}_real": d_loss_real,
-    #             f"val_loss_D{dis_id}_fake": d_loss_fake,
-    #         }
-    #     )
+    def validation_step(self, batch, batch_idx, dataloader_idx=0):
+        if dataloader_idx == 0:
+            self.v_y_real = batch
+            return
+        else:
+            self.v_x_real = batch
+
+        v_y_fake = self.gen(self.v_x_real)
+        v_disc_y_fake = self.disc((v_y_fake, self.v_x_real))
+        v_disc_y_real = self.disc((self.v_y_real, self.v_x_real))
+
+        # calculate losses for discriminator
+        d_loss_real = self.discriminator_loss(
+            v_disc_y_real, torch.ones_like(v_disc_y_real)
+        )
+        d_loss_fake = self.discriminator_loss(
+            v_disc_y_fake, torch.zeros_like(v_disc_y_fake)
+        )
+        disc_loss = self.hparams.l_disc * (d_loss_real + d_loss_fake)
+
+        # calculate similarity for Image
+        image_evaluator = ImageEvaluator(v_y_fake, self.v_y_real, split="val")
+        eval_metrics = image_evaluator()
+
+        # log similarity metrics and loss
+        self.log_dict(eval_metrics)
+        self.log_dict(
+            {
+                "val_disc_loss": disc_loss,
+                "val_disc_real_loss": d_loss_real,
+                "val_disc_fake_loss": d_loss_fake,
+            }
+        )
