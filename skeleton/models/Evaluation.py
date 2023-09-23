@@ -1,13 +1,13 @@
 import cv2
 import torch
-from scipy.spatial import distance
+from scipy.stats import entropy
 from skimage.metrics import structural_similarity as ssim
 
 
 class ImageEvaluator:
     def __init__(self, generated_image, target_image, split="test"):
-        self.generated_image = generated_image
-        self.target_image = target_image
+        self.generated_image = generated_image[0]
+        self.target_image = target_image[0]
         self.split = split
 
         # define the evaluation metrics
@@ -18,7 +18,15 @@ class ImageEvaluator:
         self.color_distance = None
 
     def calculate_SSIM(self):
-        self.SSIM = ssim(self.target_image, self.generated_image, multichannel=True)
+        self.SSIM = 0
+
+        # go through all channels
+        for i in range(self.target_image.size()[0]):
+            self.SSIM += ssim(
+                self.target_image[i].to(torch.int).numpy(),
+                self.generated_image[i].to(torch.int).numpy(),
+                multichannel=True,
+            )
 
     def calculate_PSNR(self):
         mse = torch.mean((self.target_image - self.generated_image) ** 2)
@@ -26,18 +34,28 @@ class ImageEvaluator:
         self.PSNR = 20 * torch.log10(max_pixel_value / torch.sqrt(mse))
 
     def calculate_EN(self):
-        target_histogram = cv2.calcHist([self.target_image], [0], None, [256], [0, 256])
-        generated_histogram = cv2.calcHist([self.generated_image], [0], None, [256], [0, 256])
-        self.EN = distance.entropy(target_histogram, generated_histogram)
+        target_histogram = cv2.calcHist(
+            [self.target_image.numpy()], [0], None, [256], [0, 256]
+        )
+        generated_histogram = cv2.calcHist(
+            [self.generated_image.numpy()], [0], None, [256], [0, 256]
+        )
+        self.EN = entropy(target_histogram, generated_histogram)[0]
 
     def calculate_color_distance(self):
-        self.color_distance = cv2.norm(self.target_image, self.generated_image, cv2.NORM_L2)
+        self.color_distance = cv2.norm(
+            self.target_image.numpy(), self.generated_image.numpy(), cv2.NORM_L2
+        )
 
     def calculate_SIFT(self):
         sift = cv2.SIFT_create()
 
-        keypoints_target, descriptors_target = sift.detectAndCompute(self.target_image, None)
-        keypoints_generated, descriptors_generated = sift.detectAndCompute(self.generated_image, None)
+        keypoints_target, descriptors_target = sift.detectAndCompute(
+            self.target_image.numpy().astype("uint8"), None
+        )
+        keypoints_generated, descriptors_generated = sift.detectAndCompute(
+            self.generated_image.numpy().astype("uint8"), None
+        )
 
         # Create a Brute Force Matcher
         bf = cv2.BFMatcher()
