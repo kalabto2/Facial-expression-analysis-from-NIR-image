@@ -28,6 +28,7 @@ class DenseUnetGAN(l.LightningModule):
         l_feature=1.3,
         log_nth_image=100,
         device="cuda",
+        d_every_n_step=2,
     ):
         super(DenseUnetGAN, self).__init__()
 
@@ -144,7 +145,8 @@ class DenseUnetGAN(l.LightningModule):
         self.untoggle_optimizer(opt_d)
 
         opt_g.step()
-        opt_d.step()
+        if (batch_idx + 1) % self.hparams.d_every_n_step == 0:
+            opt_d.step()
 
         # log images
         if self.global_step % (2 * self.hparams.log_nth_image) == 0:

@@ -109,6 +109,7 @@ def main(
         l_feature=l_feature,
         log_nth_image=log_nth_image,
         device="gpu" if use_gpu else "cpu",
+        d_every_n_step=2,
     )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
