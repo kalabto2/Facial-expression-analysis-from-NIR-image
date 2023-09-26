@@ -6,8 +6,8 @@ from skimage.metrics import structural_similarity as ssim
 
 class ImageEvaluator:
     def __init__(self, generated_image, target_image, split="test"):
-        self.generated_image = generated_image[0]
-        self.target_image = target_image[0]
+        self.generated_image = generated_image[0].cpu()
+        self.target_image = target_image[0].cpu()
         self.split = split
 
         # define the evaluation metrics
