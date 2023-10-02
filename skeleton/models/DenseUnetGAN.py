@@ -123,6 +123,15 @@ class DenseUnetGAN(l.LightningModule):
 
         return [opt_g, opt_d], []
 
+    def log_image(self, img_arr, nrows, split):
+        grid = make_grid(
+            img_arr,
+            nrow=nrows,
+        )
+        self.logger.experiment.add_image(
+            f"{split}_generated_images", grid, self.global_step / 2
+        )
+
     def training_step(self, batch, batch_idx):
         y, x = batch
         fake_y = self.gen(x)
@@ -210,6 +219,12 @@ class DenseUnetGAN(l.LightningModule):
             }
         )
 
+        self.log_image(
+            [grayscale_to_rgb(self.v_x_real[0]), self.v_y_real[0], v_y_fake[0]],
+            3,
+            "test",
+        )
+
     def validation_step(self, batch, batch_idx, dataloader_idx=0):
         if dataloader_idx == 0:
             self.v_y_real = batch
@@ -245,11 +260,9 @@ class DenseUnetGAN(l.LightningModule):
         )
 
         # log one image
-        if self.global_step % (2 * 500) == 0:
-            grid = make_grid(
+        if self.global_step % (2 * 50) == 0:
+            self.log_image(
                 [grayscale_to_rgb(self.v_x_real[0]), self.v_y_real[0], v_y_fake[0]],
-                nrow=3,
-            )
-            self.logger.experiment.add_image(
-                "val_generated_images", grid, self.global_step / 4
+                3,
+                "val",
             )
