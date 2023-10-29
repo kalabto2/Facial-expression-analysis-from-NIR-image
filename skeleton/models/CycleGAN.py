@@ -464,47 +464,24 @@ class CycleGAN(l.LightningModule):
         self.toggle_optimizer(optimizer_g)
         optimizer_g.zero_grad()
         self.manual_backward(self.g_loss, retain_graph=True)
-        if (
-            self.hparams.scheduler_enabled
-            and batch_idx % self.hparams.scheduler_step_freq == 0
-        ):
-            scheduler_g.step()
-
         self.untoggle_optimizer(optimizer_g)
 
         # ---------------- TRAIN GENERATOR F ----------------
         self.toggle_optimizer(optimizer_f)
         optimizer_f.zero_grad()
         self.manual_backward(self.f_loss, retain_graph=True)
-        if (
-            self.hparams.scheduler_enabled
-            and batch_idx % self.hparams.scheduler_step_freq == 0
-        ):
-            scheduler_f.step()
         self.untoggle_optimizer(optimizer_f)
 
         # ---------------- TRAIN OPTIMIZER DX ----------------
         self.toggle_optimizer(optimizer_d_x)
         optimizer_d_x.zero_grad()
         self.manual_backward(self.d_x_loss, retain_graph=False)
-        if (
-            self.hparams.scheduler_enabled
-            and batch_idx % self.hparams.scheduler_step_freq == 0
-        ):
-            scheduler_d_x.step()
-
         self.untoggle_optimizer(optimizer_d_x)
 
         # ---------------- TRAIN OPTIMIZER DY ----------------
         self.toggle_optimizer(optimizer_d_y)
         optimizer_d_y.zero_grad()
         self.manual_backward(self.d_y_loss, retain_graph=False)
-        if (
-            self.hparams.scheduler_enabled
-            and batch_idx % self.hparams.scheduler_step_freq == 0
-        ):
-            scheduler_d_y.step()
-
         self.untoggle_optimizer(optimizer_d_y)
         # ===================================================
 
@@ -513,6 +490,17 @@ class CycleGAN(l.LightningModule):
         optimizer_g.step()
         optimizer_d_x.step()
         optimizer_d_y.step()
+
+        # update scheduler's step
+        if (
+            self.hparams.scheduler_enabled
+            and batch_idx % self.hparams.scheduler_step_freq == 0
+        ):
+            scheduler_g.step()
+            scheduler_f.step()
+            scheduler_d_x.step()
+            scheduler_d_y.step()
+            print(f"scheduler: learning rate updated: G-{scheduler_g.get_last_lr()}")
         # ===================================================
 
         # log images
