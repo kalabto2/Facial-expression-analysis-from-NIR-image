@@ -148,6 +148,7 @@ def main(
         scheduler=scheduler,
         linear_lr_w_init_lr=linear_lr_w_init_lr,
         linear_lr_w_decay=linear_lr_w_decay,
+        device="gpu" if use_gpu else "cpu"
     )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)
