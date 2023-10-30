@@ -183,7 +183,9 @@ class DenseUnetGAN(l.LightningModule):
         out = self.forward(x)
 
         # calculate evaluation metrics
-        image_evaluator = ImageEvaluator(out, y, split="test")
+        image_evaluator = ImageEvaluator(
+            out, y, split="test", device=self.hparams.device
+        )
         eval_metrics = image_evaluator()
 
         # log evaluation metrics
@@ -246,7 +248,9 @@ class DenseUnetGAN(l.LightningModule):
         disc_loss = self.hparams.l_disc * (d_loss_real + d_loss_fake)
 
         # calculate similarity for Image
-        image_evaluator = ImageEvaluator(v_y_fake, self.v_y_real, split="val")
+        image_evaluator = ImageEvaluator(
+            v_y_fake, self.v_y_real, split="val", device=self.hparams.device
+        )
         eval_metrics = image_evaluator()
 
         # log similarity metrics and loss

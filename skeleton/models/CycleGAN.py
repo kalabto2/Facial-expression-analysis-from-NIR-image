@@ -37,6 +37,7 @@ class CycleGAN(l.LightningModule):
         scheduler="linear",
         linear_lr_w_init_lr=5,
         linear_lr_w_decay=5,
+        device="cpu",
     ):
         super(CycleGAN, self).__init__()
 
@@ -366,8 +367,10 @@ class CycleGAN(l.LightningModule):
         out = self.forward(x)
 
         # calculate evaluation metrics
-        image_evaluator = ImageEvaluator(out, y)
-        eval_metrics = image_evaluator(test_prefix=True)
+        image_evaluator = ImageEvaluator(
+            out, y, split="test", device=self.hparams.device
+        )
+        eval_metrics = image_evaluator()
 
         # log evaluation metrics
         self.log_dict(eval_metrics)
@@ -401,7 +404,15 @@ class CycleGAN(l.LightningModule):
         d_loss_fake = self.discriminator_loss(dis_fake, torch.zeros_like(dis_fake))
         d_loss = self.hparams.lambda_discriminator * (d_loss_real + d_loss_fake)
 
+        # calculate similarity for Image
+        image_evaluator = ImageEvaluator(
+            fake[0], real[0], split="val", device=self.hparams.device
+        )
+        eval_metrics = image_evaluator()
+
         # ------------------- LOG ------------------------------
+        # log similarity metrics and loss
+        self.log_dict(eval_metrics)
         self.log_dict(
             {
                 f"val_loss_D{dis_id}": d_loss,

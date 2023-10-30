@@ -76,6 +76,7 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--linear_lr_w_init_lr", type=int, default=5, help="TBD")
 @click.option("--linear_lr_w_decay", type=int, default=5, help="TBD")
 @click.option("--shuffle_data", type=bool, default=True, help="TBD")
+@click.option("--check_val_every_n_epoch", type=int, default=1, help="TBD")
 def main(
     batch_size: int,
     learning_rate: float,
@@ -103,6 +104,7 @@ def main(
     shuffle_data: bool,
     train_split_fp: pathlib.Path,
     val_split_fp: pathlib.Path,
+    check_val_every_n_epoch: int,
 ):
     # Print argument names and their values
     local_symbols = locals()
@@ -171,6 +173,7 @@ def main(
         callbacks=[checkpointer, LearningRateMonitor(logging_interval="step")],
         logger=[tensorboard_logger],
         default_root_dir="experiments/logs",
+        check_val_every_n_epoch=check_val_every_n_epoch,
     )
 
     # train loop

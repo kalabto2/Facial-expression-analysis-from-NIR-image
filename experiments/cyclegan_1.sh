@@ -1,8 +1,5 @@
 #! /bin/bash
 
-# Compared to experiment 6 changed:
-# * changed architecture - remove first instance norm from generator
-
 # Get the directory containing the script
 script_dir=$(dirname "$(readlink -f "$0")")
 # Get the parent directory - that is the PROJECT_HOME
@@ -13,6 +10,7 @@ echo "PROJECT_HOME directory: $PROJECT_HOME"
 
 # ================= PARAMETERS =================
 log_nth_image=100
+check_val_every_n_epoch=2
 
 # ----------------  Data -----------------------
 train_split=$PROJECT_HOME'splits/preproc_train_split_E.json'
@@ -68,4 +66,5 @@ python3 ./gan_cli_train.py --train_split_fp $train_split \
                     --scheduler_eta_min $scheduler_eta_min \
                     --weights_init $weights_init \
                     --weights_init_std $weights_init_std \
-                    --lambda_discriminator $lambda_discriminator
+                    --lambda_discriminator $lambda_discriminator \
+                    --check_val_every_n_epoch $check_val_every_n_epoch

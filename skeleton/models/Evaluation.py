@@ -2,13 +2,16 @@ import cv2
 import torch
 from scipy.stats import entropy
 from skimage.metrics import structural_similarity as ssim
+import torchvision.models as models
+import torchvision.transforms as transforms
 
 
 class ImageEvaluator:
-    def __init__(self, generated_image, target_image, split="test"):
+    def __init__(self, generated_image, target_image, split="test", device="cpu"):
         self.generated_image = generated_image[0].cpu()
         self.target_image = target_image[0].cpu()
         self.split = split
+        self.device = device
 
         # define the evaluation metrics
         self.SSIM = None
@@ -16,6 +19,30 @@ class ImageEvaluator:
         self.EN = None
         self.SIFT = None
         self.color_distance = None
+        self.feature_loss = None
+
+        # prepare VGG19 for feature loss
+        vgg19_model = models.vgg19(pretrained=True)
+        if self.device == "gpu":
+            vgg19_model = vgg19_model.cuda()
+
+        transform = transforms.Compose(
+            [
+                transforms.Resize((224, 224)),  # Resize to VGG-16 input size
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406],  # Mean values for ImageNet data
+                    std=[0.229, 0.224, 0.225],  # Standard deviations for ImageNet data
+                ),
+            ]
+        )
+        self.vgg19 = lambda x: vgg19_model(transform(torch.Tensor(x)).unsqueeze(0))
+
+    def calculate_feature_loss(self):
+        self.feature_loss = torch.norm(
+            self.vgg19(torch.stack([self.target_image] * 3))
+            - self.vgg19(torch.stack([self.generated_image] * 3)),
+            p=2,
+        )
 
     def calculate_SSIM(self):
         self.SSIM = 0
@@ -77,6 +104,7 @@ class ImageEvaluator:
         self.calculate_EN()
         self.calculate_SIFT()
         self.calculate_color_distance()
+        self.calculate_feature_loss()
 
     def get_eval_metrics(self):
         prefix = f"{self.split}_"
@@ -86,6 +114,7 @@ class ImageEvaluator:
             prefix + "EN": self.EN,
             prefix + "SIFT": self.SIFT,
             prefix + "color_distance": self.color_distance,
+            prefix + "feature_loss": self.feature_loss,
         }
 
     def __call__(self):
