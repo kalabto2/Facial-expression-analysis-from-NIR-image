@@ -70,6 +70,7 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--scheduler_step_freq", type=int, default=10, help="TBD")
 @click.option("--scheduler_n_steps", type=int, default=100, help="TBD")
 @click.option("--scheduler_eta_min", type=float, default=2e-5, help="TBD")
+@click.option("--weights_init", type=str, default="normal", help="TBD")
 @click.option("--weights_init_std", type=float, default=0.02, help="TBD")
 @click.option("--lambda_discriminator", type=float, default=0.5, help="TBD")
 @click.option("--scheduler", type=str, default="linear", help="TBD")
@@ -94,6 +95,7 @@ def main(
     scheduler_step_freq: int,
     scheduler_n_steps: int,
     scheduler_eta_min: float,
+    weights_init: str,
     weights_init_std: float,
     lambda_discriminator: float,
     scheduler: str,
@@ -139,6 +141,7 @@ def main(
         scheduler_n_steps=scheduler_n_steps,
         scheduler_enabled=scheduler_enabled,
         scheduler_eta_min=scheduler_eta_min,
+        weights_init=weights_init,
         weights_init_std=weights_init_std,
         lambda_discriminator=lambda_discriminator,
         scheduler=scheduler,

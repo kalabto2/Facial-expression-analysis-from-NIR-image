@@ -1,3 +1,5 @@
+import math
+
 import torch
 import torch.nn as nn
 import lightning.pytorch as l
@@ -29,6 +31,7 @@ class CycleGAN(l.LightningModule):
         scheduler_enabled=False,
         scheduler_n_steps=500,
         scheduler_eta_min=2e-5,
+        weights_init="normal",
         weights_init_std=0.02,
         lambda_discriminator=0.5,
         scheduler="linear",
@@ -69,8 +72,36 @@ class CycleGAN(l.LightningModule):
         return self.generator_g2f(x)
 
     def weights_init(self, model, std=0.02):
-        for name, param in model.named_parameters():
-            param.data.normal_(mean=0.0, std=std)
+        if self.hparams.weights_init == "normal":
+            for name, param in model.named_parameters():
+                param.data.normal_(mean=0.0, std=std)
+        elif self.hparams.weights_init == "xavier":
+            for name, param in model.named_parameters():
+                if name.endswith(".bias"):
+                    param.data.fill_(0)
+                elif param.dim() >= 2:
+                    bound = math.sqrt(6) / math.sqrt(param.shape[0] + param.shape[1])
+                    param.data.uniform_(-bound, bound)
+                else:
+                    param.data.normal_(mean=0.0, std=std)
+        elif self.hparams.weights_init == "kaiming":
+            for name, param in model.named_parameters():
+                if name.endswith(".bias"):
+                    param.data.fill_(0)
+                elif param.dim() >= 2:
+                    if name.startswith(
+                        "layers.0"
+                    ):  # The first layer does not have ReLU applied on its input
+                        param.data.normal_(0, 1 / math.sqrt(param.shape[1]))
+                    else:
+                        param.data.normal_(0, math.sqrt(2) / math.sqrt(param.shape[1]))
+                else:
+                    param.data.normal_(mean=0.0, std=std)
+        else:
+            raise NotImplementedError(
+                "initialization method [%s] is not implemented"
+                % self.hparams.weights_init
+            )
 
     # def init_weights(self, net, init_type='normal', std=0.02):
     #     def init_func(m):  # define the initialization function
