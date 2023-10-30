@@ -29,7 +29,7 @@ scheduler_n_steps=1000
 scheduler_eta_min=2e-5
 # ==============================================
 
-../gan_cli_train.py --data_folder $data_folder \
+python3 ../gan_cli_train.py --data_folder $data_folder \
                     --batch_size $batch_size \
                     --learning_rate $learning_rate \
                     --train_optim $train_optim \

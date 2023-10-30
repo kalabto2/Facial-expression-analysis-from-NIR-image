@@ -37,7 +37,7 @@ weights_init_std=0.02
 
 # ==============================================
 
-../gan_cli_train.py --data_folder $data_folder \
+python3 ../gan_cli_train.py --data_folder $data_folder \
                     --batch_size $batch_size \
                     --learning_rate $learning_rate \
                     --train_optim $train_optim \

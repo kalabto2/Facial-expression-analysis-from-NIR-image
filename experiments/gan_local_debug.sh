@@ -35,13 +35,18 @@ lambda_cycle=6
 train_optim="Adam"
 learning_rate=2e-4
 beta1=0.5
-scheduler_enabled=0
+scheduler_enabled=1
 scheduler_step_freq=1
 scheduler_n_steps=8
 scheduler_eta_min=2e-5
+
+# ------------- Initialization -----------------
+weights_init='kaiming'
+weights_init_std=0.02
+
 # ==============================================
 
-./gan_cli_train.py --batch_size $batch_size \
+python3 ./gan_cli_train.py --batch_size $batch_size \
                     --learning_rate $learning_rate \
                     --train_optim $train_optim \
                     --epochs $epochs \
@@ -60,4 +65,6 @@ scheduler_eta_min=2e-5
                     --scheduler_eta_min $scheduler_eta_min \
                     --shuffle_data $shuffle_data \
                     --train_split_fp $train_split_fp \
-                    --val_split_fp $val_split_fp
+                    --val_split_fp $val_split_fp \
+                    --weights_init $weights_init \
+                    --weights_init_std $weights_init_std

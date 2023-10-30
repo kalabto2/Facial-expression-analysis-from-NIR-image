@@ -43,7 +43,7 @@ beta1=0.5
 #scheduler_eta_min=2e-5
 # ==============================================
 
-./denseUnetGan_cli.py --batch_size $batch_size \
+python3 ./denseUnetGan_cli.py --batch_size $batch_size \
                     --learning_rate $learning_rate \
                     --epochs $epochs \
                     --use_gpu $use_gpu \
