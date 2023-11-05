@@ -7,10 +7,10 @@ import torchvision.transforms as transforms
 
 
 class ImageEvaluator:
-    def __init__(self, generated_image, target_image, split="test", device="cpu"):
-        self.generated_image = generated_image[0].cpu()
-        self.target_image = target_image[0].cpu()
-        self.split = split
+    def __init__(self, device="cpu"):
+        self.generated_image = None
+        self.target_image = None
+        self.split = None
         self.device = device
 
         # define the evaluation metrics
@@ -35,12 +35,18 @@ class ImageEvaluator:
                 ),
             ]
         )
-        self.vgg19 = lambda x: vgg19_model(transform(torch.Tensor(x)).unsqueeze(0))
+        self.vgg19 = lambda x: vgg19_model(transform(x))
 
     def calculate_feature_loss(self):
+        if self.target_image.size()[0] == 1:
+            target_adjusted = torch.stack([self.target_image] * 3, dim=1)
+            generated_adjusted = torch.stack([self.generated_image] * 3, dim=1)
+        else:
+            target_adjusted = torch.unsqueeze(self.target_image, 0)
+            generated_adjusted = torch.unsqueeze(self.generated_image, 0)
+
         self.feature_loss = torch.norm(
-            self.vgg19(torch.stack([self.target_image] * 3))
-            - self.vgg19(torch.stack([self.generated_image] * 3)),
+            self.vgg19(target_adjusted) - self.vgg19(generated_adjusted),
             p=2,
         )
 
@@ -98,12 +104,20 @@ class ImageEvaluator:
 
         self.SIFT = len(good_matches)
 
-    def setup(self):
+    def setup(self, generated_image, target_image, split):
+        self.split = split
+        self.generated_image = generated_image[0].cpu()
+        self.target_image = target_image[0].cpu()
+
         self.calculate_SSIM()
         self.calculate_PSNR()
         self.calculate_EN()
         self.calculate_SIFT()
         self.calculate_color_distance()
+
+        self.generated_image = generated_image[0]
+        self.target_image = target_image[0]
+
         self.calculate_feature_loss()
 
     def get_eval_metrics(self):
@@ -117,6 +131,6 @@ class ImageEvaluator:
             prefix + "feature_loss": self.feature_loss,
         }
 
-    def __call__(self):
-        self.setup()
+    def __call__(self, generated_image, target_image, split):
+        self.setup(generated_image, target_image, split)
         return self.get_eval_metrics()
