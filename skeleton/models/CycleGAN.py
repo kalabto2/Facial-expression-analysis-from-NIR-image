@@ -364,139 +364,133 @@ class CycleGAN(l.LightningModule):
                 "generated_images", grid, self.global_step / 4
             )
 
-    def test_step(self, batch, batch_idx, dataloader_idx=0):
-        if dataloader_idx == 0:
-            self.te_real_x = batch
-            self.te_fake_y = self.generator_g2f(self.te_real_x)
-            self.te_rec_x = self.generator_f2g(self.te_fake_y)
-            self.te_dis_real_x = self.discriminator_x(self.te_real_x)
-            self.te_dis_fake_y = self.discriminator_y(self.te_fake_y)
-        else:
-            self.te_real_y = batch
-            self.te_fake_x = self.generator_f2g(self.te_real_y)
-            self.te_rec_y = self.generator_g2f(self.te_fake_x)
-            self.te_dis_real_y = self.discriminator_y(self.te_real_y)
-            self.te_dis_fake_x = self.discriminator_x(self.te_fake_x)
+    def test_step(self, batch, batch_idx):
+        self.te_real_x = batch[0][0].unsqueeze(0)
+        self.te_fake_y = self.generator_g2f(self.te_real_x)
+        self.te_rec_x = self.generator_f2g(self.te_fake_y)
+        self.te_dis_real_x = self.discriminator_x(self.te_real_x)
+        self.te_dis_fake_y = self.discriminator_y(self.te_fake_y)
+        self.te_real_y = batch[0][1][0].unsqueeze(0).unsqueeze(0)
 
-            # calculate similarity for Image
-            eval_metrics_y = self.image_evaluator(
-                self.te_fake_y, self.te_real_y, "test"
-            )
-            eval_metrics_x = self.image_evaluator(
-                self.te_fake_x, self.te_real_x, "test"
-            )
+        self.te_fake_x = self.generator_f2g(self.te_real_y)
+        self.te_rec_y = self.generator_g2f(self.te_fake_x)
+        self.te_dis_real_y = self.discriminator_y(self.te_real_y)
+        self.te_dis_fake_x = self.discriminator_x(self.te_fake_x)
 
-            # log similarity metrics
-            self.log_dict(eval_metrics_x)
-            self.log_dict(eval_metrics_y)
+        # calculate similarity for Image
+        eval_metrics_y = self.image_evaluator(self.te_fake_y, self.te_real_y, "test")
+        eval_metrics_x = self.image_evaluator(self.te_fake_x, self.te_real_x, "test")
 
-            # log images
-            if self.global_step % 2 == 0:
-                grid = make_grid(
-                    [
-                        self.te_real_x[0],
-                        grayscale_to_rgb(self.te_fake_y[0]),
-                        self.te_rec_x[0],
-                        grayscale_to_rgb(self.te_real_y[0]),
-                        self.te_fake_x[0],
-                        grayscale_to_rgb(self.te_rec_y[0]),
-                    ],
-                    nrow=3,
-                )
+        # log similarity metrics
+        self.log_dict(eval_metrics_x)
+        self.log_dict(eval_metrics_y)
 
-                image_folder = pathlib.Path("test-images-out")
-                image_folder.mkdir(parents=True, exist_ok=True)
-                torchvision.utils.save_image(grid, image_folder / f"{batch_idx}.png")
-
-            # calculate the loss
-            dx_loss_real = self.discriminator_loss(
-                self.te_dis_real_x, torch.ones_like(self.te_dis_real_x)
-            )
-            dx_loss_fake = self.discriminator_loss(
-                self.te_dis_fake_x, torch.zeros_like(self.te_dis_fake_x)
-            )
-            dx_loss = self.hparams.lambda_discriminator * (dx_loss_real + dx_loss_fake)
-            dy_loss_real = self.discriminator_loss(
-                self.te_dis_real_y, torch.ones_like(self.te_dis_real_y)
-            )
-            dy_loss_fake = self.discriminator_loss(
-                self.te_dis_fake_y, torch.zeros_like(self.te_dis_fake_y)
-            )
-            dy_loss = self.hparams.lambda_discriminator * (dy_loss_real + dy_loss_fake)
-
-            self.log_dict(
-                {
-                    f"test_loss_Dx": dx_loss,
-                    f"test_loss_Dx_real": dx_loss_real,
-                    f"test_loss_Dx_fake": dx_loss_fake,
-                    f"test_loss_Dy": dy_loss,
-                    f"test_loss_Dy_real": dy_loss_real,
-                    f"test_loss_Dy_fake": dy_loss_fake,
-                }
+        # log images
+        if self.global_step % 2 == 0:
+            grid = make_grid(
+                [
+                    self.te_real_x[0],
+                    grayscale_to_rgb(self.te_fake_y[0]),
+                    self.te_rec_x[0],
+                    grayscale_to_rgb(self.te_real_y[0]),
+                    self.te_fake_x[0],
+                    grayscale_to_rgb(self.te_rec_y[0]),
+                ],
+                nrow=3,
             )
 
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        if dataloader_idx == 0:
-            self.v_real_x = batch
-            self.v_fake_y = self.generator_g2f(self.v_real_x)
-            self.v_rec_x = self.generator_f2g(self.v_fake_y)
-            self.v_dis_real_x = self.discriminator_x(self.v_real_x)
-            self.v_dis_fake_y = self.discriminator_y(self.v_fake_y)
-        else:
-            self.v_real_y = batch
-            self.v_fake_x = self.generator_f2g(self.v_real_y)
-            self.v_rec_y = self.generator_g2f(self.v_fake_x)
-            self.v_dis_real_y = self.discriminator_y(self.v_real_y)
-            self.v_dis_fake_x = self.discriminator_x(self.v_fake_x)
+            image_folder = pathlib.Path("test-images-out")
+            image_folder.mkdir(parents=True, exist_ok=True)
+            torchvision.utils.save_image(grid, image_folder / f"{batch_idx}.png")
 
-            # calculate similarity for Image
-            eval_metrics_y = self.image_evaluator(self.v_fake_y, self.v_real_y, "val")
-            eval_metrics_x = self.image_evaluator(self.v_fake_x, self.v_real_x, "val")
+        # calculate the loss
+        dx_loss_real = self.discriminator_loss(
+            self.te_dis_real_x, torch.ones_like(self.te_dis_real_x)
+        )
+        dx_loss_fake = self.discriminator_loss(
+            self.te_dis_fake_x, torch.zeros_like(self.te_dis_fake_x)
+        )
+        dx_loss = self.hparams.lambda_discriminator * (dx_loss_real + dx_loss_fake)
+        dy_loss_real = self.discriminator_loss(
+            self.te_dis_real_y, torch.ones_like(self.te_dis_real_y)
+        )
+        dy_loss_fake = self.discriminator_loss(
+            self.te_dis_fake_y, torch.zeros_like(self.te_dis_fake_y)
+        )
+        dy_loss = self.hparams.lambda_discriminator * (dy_loss_real + dy_loss_fake)
 
-            # log similarity metrics
-            self.log_dict(eval_metrics_x)
-            self.log_dict(eval_metrics_y)
+        self.log_dict(
+            {
+                f"test_loss_Dx": dx_loss,
+                f"test_loss_Dx_real": dx_loss_real,
+                f"test_loss_Dx_fake": dx_loss_fake,
+                f"test_loss_Dy": dy_loss,
+                f"test_loss_Dy_real": dy_loss_real,
+                f"test_loss_Dy_fake": dy_loss_fake,
+            }
+        )
 
-            # log images
-            if self.global_step % 2 == 0:
-                grid = make_grid(
-                    [
-                        self.v_real_x[0],
-                        grayscale_to_rgb(self.v_fake_y[0]),
-                        self.v_rec_x[0],
-                        grayscale_to_rgb(self.v_real_y[0]),
-                        self.v_fake_x[0],
-                        grayscale_to_rgb(self.v_rec_y[0]),
-                    ],
-                    nrow=3,
-                )
-                self.logger.experiment.add_image(
-                    "val_generated_images", grid, self.global_step / 4
-                )
+    def validation_step(self, batch, batch_idx):
+        self.v_real_x = batch[0][0].unsqueeze(0)
+        self.v_fake_y = self.generator_g2f(self.v_real_x)
+        self.v_rec_x = self.generator_f2g(self.v_fake_y)
+        self.v_dis_real_x = self.discriminator_x(self.v_real_x)
+        self.v_dis_fake_y = self.discriminator_y(self.v_fake_y)
 
-            # calculate the loss
-            dx_loss_real = self.discriminator_loss(
-                self.v_dis_real_x, torch.ones_like(self.v_dis_real_x)
-            )
-            dx_loss_fake = self.discriminator_loss(
-                self.v_dis_fake_x, torch.zeros_like(self.v_dis_fake_x)
-            )
-            dx_loss = self.hparams.lambda_discriminator * (dx_loss_real + dx_loss_fake)
-            dy_loss_real = self.discriminator_loss(
-                self.v_dis_real_y, torch.ones_like(self.v_dis_real_y)
-            )
-            dy_loss_fake = self.discriminator_loss(
-                self.v_dis_fake_y, torch.zeros_like(self.v_dis_fake_y)
-            )
-            dy_loss = self.hparams.lambda_discriminator * (dy_loss_real + dy_loss_fake)
+        self.v_real_y = batch[0][1][0].unsqueeze(0).unsqueeze(0)
+        self.v_fake_x = self.generator_f2g(self.v_real_y)
+        self.v_rec_y = self.generator_g2f(self.v_fake_x)
+        self.v_dis_real_y = self.discriminator_y(self.v_real_y)
+        self.v_dis_fake_x = self.discriminator_x(self.v_fake_x)
 
-            self.log_dict(
-                {
-                    f"val_loss_Dx": dx_loss,
-                    f"val_loss_Dx_real": dx_loss_real,
-                    f"val_loss_Dx_fake": dx_loss_fake,
-                    f"val_loss_Dy": dy_loss,
-                    f"val_loss_Dy_real": dy_loss_real,
-                    f"val_loss_Dy_fake": dy_loss_fake,
-                }
+        # calculate similarity for Image
+        eval_metrics_y = self.image_evaluator(self.v_fake_y, self.v_real_y, "val")
+        eval_metrics_x = self.image_evaluator(self.v_fake_x, self.v_real_x, "val")
+
+        # log similarity metrics
+        self.log_dict(eval_metrics_x)
+        self.log_dict(eval_metrics_y)
+
+        # log images
+        if self.global_step % 2 == 0:
+            grid = make_grid(
+                [
+                    self.v_real_x[0],
+                    grayscale_to_rgb(self.v_fake_y[0]),
+                    self.v_rec_x[0],
+                    grayscale_to_rgb(self.v_real_y[0]),
+                    self.v_fake_x[0],
+                    grayscale_to_rgb(self.v_rec_y[0]),
+                ],
+                nrow=3,
             )
+            self.logger.experiment.add_image(
+                "val_generated_images", grid, self.global_step / 4
+            )
+
+        # calculate the loss
+        dx_loss_real = self.discriminator_loss(
+            self.v_dis_real_x, torch.ones_like(self.v_dis_real_x)
+        )
+        dx_loss_fake = self.discriminator_loss(
+            self.v_dis_fake_x, torch.zeros_like(self.v_dis_fake_x)
+        )
+        dx_loss = self.hparams.lambda_discriminator * (dx_loss_real + dx_loss_fake)
+        dy_loss_real = self.discriminator_loss(
+            self.v_dis_real_y, torch.ones_like(self.v_dis_real_y)
+        )
+        dy_loss_fake = self.discriminator_loss(
+            self.v_dis_fake_y, torch.zeros_like(self.v_dis_fake_y)
+        )
+        dy_loss = self.hparams.lambda_discriminator * (dy_loss_real + dy_loss_fake)
+
+        self.log_dict(
+            {
+                f"val_loss_Dx": dx_loss,
+                f"val_loss_Dx_real": dx_loss_real,
+                f"val_loss_Dx_fake": dx_loss_fake,
+                f"val_loss_Dy": dy_loss,
+                f"val_loss_Dy_real": dy_loss_real,
+                f"val_loss_Dy_fake": dy_loss_fake,
+            }
+        )
