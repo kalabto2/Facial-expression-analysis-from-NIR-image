@@ -378,30 +378,28 @@ class CycleGAN(l.LightningModule):
         self.te_dis_fake_x = self.discriminator_x(self.te_fake_x)
 
         # calculate similarity for Image
-        eval_metrics_y = self.image_evaluator(self.te_fake_y, self.te_real_y, "test")
-        eval_metrics_x = self.image_evaluator(self.te_fake_x, self.te_real_x, "test")
+        eval_metrics_y = self.image_evaluator(self.te_fake_y, self.te_real_y, "test-y")
+        eval_metrics_x = self.image_evaluator(self.te_fake_x, self.te_real_x, "test-x")
 
         # log similarity metrics
         self.log_dict(eval_metrics_x)
         self.log_dict(eval_metrics_y)
 
         # log images
-        if self.global_step % 2 == 0:
-            grid = make_grid(
-                [
-                    self.te_real_x[0],
-                    grayscale_to_rgb(self.te_fake_y[0]),
-                    self.te_rec_x[0],
-                    grayscale_to_rgb(self.te_real_y[0]),
-                    self.te_fake_x[0],
-                    grayscale_to_rgb(self.te_rec_y[0]),
-                ],
-                nrow=3,
-            )
-
-            image_folder = pathlib.Path("test-images-out")
-            image_folder.mkdir(parents=True, exist_ok=True)
-            torchvision.utils.save_image(grid, image_folder / f"{batch_idx}.png")
+        grid = make_grid(
+            [
+                self.te_real_x[0],
+                grayscale_to_rgb(self.te_fake_y[0]),
+                self.te_rec_x[0],
+                grayscale_to_rgb(self.te_real_y[0]),
+                self.te_fake_x[0],
+                grayscale_to_rgb(self.te_rec_y[0]),
+            ],
+            nrow=3,
+        )
+        image_folder = pathlib.Path("test-images-out")
+        image_folder.mkdir(parents=True, exist_ok=True)
+        torchvision.utils.save_image(grid, image_folder / f"{batch_idx}.png")
 
         # calculate the loss
         dx_loss_real = self.discriminator_loss(
@@ -444,15 +442,15 @@ class CycleGAN(l.LightningModule):
         self.v_dis_fake_x = self.discriminator_x(self.v_fake_x)
 
         # calculate similarity for Image
-        eval_metrics_y = self.image_evaluator(self.v_fake_y, self.v_real_y, "val")
-        eval_metrics_x = self.image_evaluator(self.v_fake_x, self.v_real_x, "val")
+        eval_metrics_y = self.image_evaluator(self.v_fake_y, self.v_real_y, "val-y")
+        eval_metrics_x = self.image_evaluator(self.v_fake_x, self.v_real_x, "val-x")
 
         # log similarity metrics
         self.log_dict(eval_metrics_x)
         self.log_dict(eval_metrics_y)
 
-        # log images
-        if self.global_step % 2 == 0:
+        if batch_idx % self.log_nth_image == 0:
+            # log images
             grid = make_grid(
                 [
                     self.v_real_x[0],
@@ -464,9 +462,7 @@ class CycleGAN(l.LightningModule):
                 ],
                 nrow=3,
             )
-            self.logger.experiment.add_image(
-                "val_generated_images", grid, self.global_step / 4
-            )
+            self.logger.experiment.add_image("val_generated_images", grid, batch_idx)
 
         # calculate the loss
         dx_loss_real = self.discriminator_loss(
