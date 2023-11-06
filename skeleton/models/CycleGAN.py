@@ -73,6 +73,8 @@ class CycleGAN(l.LightningModule):
 
         self.image_evaluator = ImageEvaluator(device=device)
 
+        self.val_step = 0
+
     def forward(self, x):
         return self.generator_g2f(x)
 
@@ -449,7 +451,7 @@ class CycleGAN(l.LightningModule):
         self.log_dict(eval_metrics_x)
         self.log_dict(eval_metrics_y)
 
-        if batch_idx % self.hparams.log_nth_image == 0:
+        if self.val_step % self.hparams.log_nth_image == 0:
             # log images
             grid = make_grid(
                 [
@@ -462,7 +464,9 @@ class CycleGAN(l.LightningModule):
                 ],
                 nrow=3,
             )
-            self.logger.experiment.add_image("val_generated_images", grid, batch_idx)
+            self.logger.experiment.add_image(
+                "val_generated_images", grid, self.val_step
+            )
 
         # calculate the loss
         dx_loss_real = self.discriminator_loss(
@@ -490,3 +494,5 @@ class CycleGAN(l.LightningModule):
                 f"val_loss_Dy_fake": dy_loss_fake,
             }
         )
+
+        self.val_step += 1
