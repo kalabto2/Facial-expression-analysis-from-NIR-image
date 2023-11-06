@@ -49,11 +49,11 @@ class OuluCasiaDataset(Dataset):
 
     def __len__(self):
         # Return the total number of samples in the dataset
-        return len(self.data_filepaths)
+        return len(self.from_ni_split_fp)
 
     def __getitem__(self, idx):  # TODO finish
         if not self.on_the_fly:
-            return self.data[idx]
+            raise NotImplementedError
         else:
             image = []
             if self.split in ["both", "VL"]:
