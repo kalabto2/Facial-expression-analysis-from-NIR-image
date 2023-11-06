@@ -49,7 +49,11 @@ class OuluCasiaDataset(Dataset):
 
     def __len__(self):
         # Return the total number of samples in the dataset
-        return len(self.from_ni_split_fp)
+        return (
+            len(self.from_ni_split_fp)
+            if self.split == "NI"
+            else len(self.from_vl_split_fp)
+        )
 
     def __getitem__(self, idx):  # TODO finish
         if not self.on_the_fly:
