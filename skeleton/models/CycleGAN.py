@@ -449,7 +449,7 @@ class CycleGAN(l.LightningModule):
         self.log_dict(eval_metrics_x)
         self.log_dict(eval_metrics_y)
 
-        if batch_idx % self.log_nth_image == 0:
+        if batch_idx % self.hparams.log_nth_image == 0:
             # log images
             grid = make_grid(
                 [
