@@ -25,6 +25,7 @@ restore_training_from_checkpoint="/" # '/' stands for no restore, else specify p
 num_workers=4
 use_gpu=0
 random_seed=1337
+num_generators_optimization=1
 
 # ------------- Architecture -------------------
 n_residual_blocks=6
@@ -67,4 +68,5 @@ python3 ./gan_cli_train.py --batch_size $batch_size \
                     --train_split_fp $train_split_fp \
                     --val_split_fp $val_split_fp \
                     --weights_init $weights_init \
-                    --weights_init_std $weights_init_std
+                    --weights_init_std $weights_init_std \
+                    --num_generators_optimization $num_generators_optimization

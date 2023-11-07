@@ -77,6 +77,7 @@ from skeleton.models.CycleGAN import CycleGAN
 @click.option("--linear_lr_w_decay", type=int, default=5, help="TBD")
 @click.option("--shuffle_data", type=bool, default=True, help="TBD")
 @click.option("--check_val_every_n_epoch", type=int, default=1, help="TBD")
+@click.option("--num_generators_optimization", type=int, default=1, help="TBD")
 def main(
     batch_size: int,
     learning_rate: float,
@@ -105,6 +106,7 @@ def main(
     train_split_fp: pathlib.Path,
     val_split_fp: pathlib.Path,
     check_val_every_n_epoch: int,
+    num_generators_optimization: int,
 ):
     # Print argument names and their values
     local_symbols = locals()
@@ -148,7 +150,8 @@ def main(
         scheduler=scheduler,
         linear_lr_w_init_lr=linear_lr_w_init_lr,
         linear_lr_w_decay=linear_lr_w_decay,
-        device="gpu" if use_gpu else "cpu"
+        device="gpu" if use_gpu else "cpu",
+        num_generators_optimization=num_generators_optimization,
     )
 
     checkpointer = ModelCheckpoint(auto_insert_metric_name=False)

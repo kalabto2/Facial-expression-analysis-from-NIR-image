@@ -40,6 +40,7 @@ class CycleGAN(l.LightningModule):
         linear_lr_w_init_lr=5,
         linear_lr_w_decay=5,
         device="cpu",
+        num_generators_optimization=1,
     ):
         super(CycleGAN, self).__init__()
 
@@ -203,14 +204,15 @@ class CycleGAN(l.LightningModule):
         )
 
         # log losses
-        self.log_dict(
-            {
-                f"{gen_id}_adv_loss": adv_loss,
-                f"{gen_id}_cycle_consistency_loss": total_cycle_consistency_loss,
-                f"{gen_id}_identity_loss": id_loss,
-                f"{gen_id}_loss": total_loss,
-            }
-        )
+        if self.log_gen_loss:
+            self.log_dict(
+                {
+                    f"{gen_id}_adv_loss": adv_loss,
+                    f"{gen_id}_cycle_consistency_loss": total_cycle_consistency_loss,
+                    f"{gen_id}_identity_loss": id_loss,
+                    f"{gen_id}_loss": total_loss,
+                }
+            )
 
         return total_loss
 
@@ -289,12 +291,6 @@ class CycleGAN(l.LightningModule):
         )
 
     def training_step(self, batch, batch_idx):
-        # generate all images, discriminators
-        self.generate(batch)
-
-        # calculate losses
-        self.calculate_losses()
-
         # get optimizers and schedulers for each model
         optimizer_g, optimizer_f, optimizer_d_x, optimizer_d_y = self.optimizers()
         if self.hparams.scheduler_enabled:
@@ -306,17 +302,28 @@ class CycleGAN(l.LightningModule):
             ) = self.lr_schedulers()
 
         # ================== BACKPROPAGATE ==================
-        # ---------------- TRAIN GENERATOR G ----------------
-        self.toggle_optimizer(optimizer_g)
-        optimizer_g.zero_grad()
-        self.manual_backward(self.g_loss, retain_graph=True)
-        self.untoggle_optimizer(optimizer_g)
+        for i in range(self.hparams.num_generators_optimization):
+            self.log_gen_loss = i + 1 == self.hparams.num_generators_optimization
+            # generate all images, discriminators
+            self.generate(batch)
+            # calculate losses
+            self.calculate_losses()
 
-        # ---------------- TRAIN GENERATOR F ----------------
-        self.toggle_optimizer(optimizer_f)
-        optimizer_f.zero_grad()
-        self.manual_backward(self.f_loss, retain_graph=True)
-        self.untoggle_optimizer(optimizer_f)
+            # ---------------- TRAIN GENERATOR G ----------------
+            self.toggle_optimizer(optimizer_g)
+            optimizer_g.zero_grad()
+            self.manual_backward(self.g_loss, retain_graph=True)
+            self.untoggle_optimizer(optimizer_g)
+
+            # ---------------- TRAIN GENERATOR F ----------------
+            self.toggle_optimizer(optimizer_f)
+            optimizer_f.zero_grad()
+            self.manual_backward(self.f_loss, retain_graph=True)
+            self.untoggle_optimizer(optimizer_f)
+
+            # update weights
+            optimizer_f.step()
+            optimizer_g.step()
 
         # ---------------- TRAIN OPTIMIZER DX ----------------
         self.toggle_optimizer(optimizer_d_x)
@@ -332,8 +339,6 @@ class CycleGAN(l.LightningModule):
         # ===================================================
 
         # update weights
-        optimizer_f.step()
-        optimizer_g.step()
         optimizer_d_x.step()
         optimizer_d_y.step()
 
