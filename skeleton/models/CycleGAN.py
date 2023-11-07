@@ -208,8 +208,9 @@ class CycleGAN(l.LightningModule):
             self.log_dict(
                 {
                     f"{gen_id}_adv_loss": adv_loss,
-                    f"{gen_id}_cycle_consistency_loss": total_cycle_consistency_loss,
-                    f"{gen_id}_identity_loss": id_loss,
+                    f"{gen_id}_cycle_consistency_loss": self.hparams.lambda_cycle
+                    * total_cycle_consistency_loss,
+                    f"{gen_id}_identity_loss": self.hparams.lambda_idt * id_loss,
                     f"{gen_id}_loss": total_loss,
                 }
             )
