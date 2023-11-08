@@ -78,6 +78,10 @@ def main(
         trainer.test(datamodule=dm, model=model)
 
     if mode in ["test-onnx", "onnx"]:
+        # prepare path
+        onnx_fp.parent.mkdir(parents=True, exist_ok=True)
+
+        # export model
         model.to_onnx(onnx_fp, torch.randn((3, *dm.image_shape)), export_params=True)
 
 
