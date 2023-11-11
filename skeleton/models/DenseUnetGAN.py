@@ -69,6 +69,8 @@ class DenseUnetGAN(l.LightningModule):
         )
         self.vgg19 = lambda x: vgg19_model(transform(x[0]).unsqueeze(0))
 
+        self.image_evaluator = ImageEvaluator(device=device)
+
     def forward(self, x):
         return self.gen(x)
 
@@ -233,48 +235,43 @@ class DenseUnetGAN(l.LightningModule):
                 "generated_images", grid, self.global_step / 2
             )
 
-    def test_step(self, batch, batch_idx, dataloader_idx=0):
-        if dataloader_idx == 0:
-            self.te_y = batch
-            return
-        else:
-            x = batch
-        y = self.te_y
-
-        # generate output
-        out = self.forward(x)
-
-        # calculate evaluation metrics
-        image_evaluator = ImageEvaluator(
-            out, y, split="test", device=self.hparams.device
+            # log
+        self.log_dict(
+            {
+                "gen_col_loss": color_loss_2,
+                "gen_pix_loss": pix_loss_2,
+                "gen_feat_loss": feature_loss_2,
+                "gen_adv_loss": adversarial_loss_2,
+                "gen_loss": gan_loss_2,
+                "disc_loss": disc_loss,
+            }
         )
-        eval_metrics = image_evaluator()
 
-        # log evaluation metrics
-        self.log_dict(eval_metrics)
+    def test_step(self, batch, batch_idx, dataloader_idx=0):
+        y = batch[0][0].unsqueeze(0)
+        x = batch[0][1][0].unsqueeze(0).unsqueeze(0)
 
-        # log images
-        if self.global_step % (2 * self.hparams.log_nth_image) == 0:
-            grid = make_grid([grayscale_to_rgb(x[0]), y[0], out[0]], nrow=3)
-            self.logger.experiment.add_image(
-                "test_generated_images", grid, self.global_step / 4
+        fake_y = self.gen(x)
+        d_real = self.disc((x, y))
+        d_fake = self.disc((x, fake_y))
+
+        eval_metrics_y = self.image_evaluator(fake_y, y, "test-y")
+
+        self.log_dict(eval_metrics_y)
+
+        # log one image
+        if self.global_step % (2 * 50) == 0:
+            self.log_image(
+                [grayscale_to_rgb(x[0]), y[0], fake_y[0]],
+                3,
+                "test",
             )
 
-        # ------------ TEST DISCRIMINATOR ---------------
-        v_y_fake = self.gen(self.v_x_real)
-        v_disc_y_fake = self.disc((v_y_fake, self.v_x_real))
-        v_disc_y_real = self.disc((self.v_y_real, self.v_x_real))
-
         # calculate losses for discriminator
-        d_loss_real = self.discriminator_loss(
-            v_disc_y_real, torch.ones_like(v_disc_y_real)
-        )
-        d_loss_fake = self.discriminator_loss(
-            v_disc_y_fake, torch.zeros_like(v_disc_y_fake)
-        )
+        d_loss_real = self.discriminator_loss(d_real, torch.ones_like(d_real))
+        d_loss_fake = self.discriminator_loss(d_fake, torch.zeros_like(d_fake))
         disc_loss = self.hparams.l_disc * (d_loss_real + d_loss_fake)
 
-        # log discriminator's test losses
         self.log_dict(
             {
                 "test_disc_loss": disc_loss,
@@ -283,40 +280,31 @@ class DenseUnetGAN(l.LightningModule):
             }
         )
 
-        self.log_image(
-            [grayscale_to_rgb(self.v_x_real[0]), self.v_y_real[0], v_y_fake[0]],
-            3,
-            "test",
-        )
+    def validation_step(self, batch, batch_idx):
+        y = batch[0][0].unsqueeze(0)
+        x = batch[0][1][0].unsqueeze(0).unsqueeze(0)
 
-    def validation_step(self, batch, batch_idx, dataloader_idx=0):
-        if dataloader_idx == 0:
-            self.v_y_real = batch
-            return
-        else:
-            self.v_x_real = batch
+        fake_y = self.gen(x)
+        d_real = self.disc((x, y))
+        d_fake = self.disc((x, fake_y))
 
-        v_y_fake = self.gen(self.v_x_real)
-        v_disc_y_fake = self.disc((v_y_fake, self.v_x_real))
-        v_disc_y_real = self.disc((self.v_y_real, self.v_x_real))
+        eval_metrics_y = self.image_evaluator(fake_y, y, "val-y")
+
+        self.log_dict(eval_metrics_y)
+
+        # log one image
+        if self.global_step % (2 * 50) == 0:
+            self.log_image(
+                [grayscale_to_rgb(x[0]), y[0], fake_y[0]],
+                3,
+                "val",
+            )
 
         # calculate losses for discriminator
-        d_loss_real = self.discriminator_loss(
-            v_disc_y_real, torch.ones_like(v_disc_y_real)
-        )
-        d_loss_fake = self.discriminator_loss(
-            v_disc_y_fake, torch.zeros_like(v_disc_y_fake)
-        )
+        d_loss_real = self.discriminator_loss(d_real, torch.ones_like(d_real))
+        d_loss_fake = self.discriminator_loss(d_fake, torch.zeros_like(d_fake))
         disc_loss = self.hparams.l_disc * (d_loss_real + d_loss_fake)
 
-        # calculate similarity for Image
-        image_evaluator = ImageEvaluator(
-            v_y_fake, self.v_y_real, split="val", device=self.hparams.device
-        )
-        eval_metrics = image_evaluator()
-
-        # log similarity metrics and loss
-        self.log_dict(eval_metrics)
         self.log_dict(
             {
                 "val_disc_loss": disc_loss,
@@ -324,11 +312,3 @@ class DenseUnetGAN(l.LightningModule):
                 "val_disc_fake_loss": d_loss_fake,
             }
         )
-
-        # log one image
-        if self.global_step % (2 * 50) == 0:
-            self.log_image(
-                [grayscale_to_rgb(self.v_x_real[0]), self.v_y_real[0], v_y_fake[0]],
-                3,
-                "val",
-            )
