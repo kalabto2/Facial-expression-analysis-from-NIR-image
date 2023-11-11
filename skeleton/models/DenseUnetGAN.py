@@ -134,28 +134,80 @@ class DenseUnetGAN(l.LightningModule):
 
     def training_step(self, batch, batch_idx):
         y, x = batch
-        fake_y = self.gen(x)
-        d_real = self.disc((x, y))
-        d_fake = self.disc((x, fake_y))
 
-        gen_loss, disc_loss = self.calculate_loss(fake_y, y, d_real, d_fake)
+        # ======== BACKPROP GEN ===============
+
+        fake_y = self.gen(x)
+        # d_real = self.disc((x.clone(), y.clone()))
+        d_fake = self.disc((x, fake_y))
 
         # get optimizers and schedulers for each model
         opt_g, opt_d = self.optimizers()
 
+        # prepare Gaussian kernel for color loss
+        gaussian_blur = GaussianBlur((15, 15), math.sqrt(3))
+
+        # calculate generator losses
+        color_loss = self.hparams.l_color * self.color_loss(
+            gaussian_blur(fake_y), gaussian_blur(y)
+        )
+        pix_loss = self.hparams.l_pix * self.pix_loss(fake_y, y)
+        feature_loss = self.hparams.l_feature * torch.norm(
+            self.vgg19(y) - self.vgg19(fake_y), p=2
+        )
+        adversarial_loss = self.adversarial_loss(d_fake, torch.ones_like(d_fake))
+        gan_loss = adversarial_loss + color_loss + pix_loss + feature_loss
+
         self.toggle_optimizer(opt_g)
         opt_g.zero_grad()
-        self.manual_backward(gen_loss, retain_graph=True)
+        self.manual_backward(gan_loss, retain_graph=True)
         self.untoggle_optimizer(opt_g)
+
+        opt_g.step()
+
+        # =========== BACKPROP GEN AGAIN ======
+
+        fake_y_2 = self.gen(x)
+        # d_real = self.disc((x.clone(), y.clone()))
+        d_fake_2 = self.disc((x, fake_y_2))
+
+        # calculate generator losses
+        color_loss_2 = self.hparams.l_color * self.color_loss(
+            gaussian_blur(fake_y_2), gaussian_blur(y)
+        )
+        pix_loss_2 = self.hparams.l_pix * self.pix_loss(fake_y_2, y)
+        feature_loss_2 = self.hparams.l_feature * torch.norm(
+            self.vgg19(y) - self.vgg19(fake_y_2), p=2
+        )
+        adversarial_loss_2 = self.adversarial_loss(d_fake_2, torch.ones_like(d_fake_2))
+        gan_loss_2 = adversarial_loss_2 + color_loss_2 + pix_loss_2 + feature_loss_2
+
+        self.toggle_optimizer(opt_g)
+        opt_g.zero_grad()
+        self.manual_backward(gan_loss_2, retain_graph=True)
+        self.untoggle_optimizer(opt_g)
+
+        opt_g.step()
+
+        # =========== BACKPROP DISC ===========
+
+        fake_y_3 = self.gen(x)
+        d_real_2 = self.disc((x, y))
+        d_fake_2 = self.disc((x, fake_y_3))
+
+        # calculate discriminator loss
+        d_loss_real = self.discriminator_loss(d_real_2, torch.ones_like(d_real_2))
+        d_loss_fake = self.discriminator_loss(d_fake_2, torch.zeros_like(d_fake_2))
+        disc_loss = self.hparams.l_disc * (d_loss_real + d_loss_fake)
 
         self.toggle_optimizer(opt_d)
         opt_d.zero_grad()
-        self.manual_backward(disc_loss)
+        self.manual_backward(disc_loss, retain_graph=True)
         self.untoggle_optimizer(opt_d)
 
-        opt_g.step()
-        if (batch_idx + 1) % self.hparams.d_every_n_step == 0:
-            opt_d.step()
+        opt_d.step()
+
+        # =====================================
 
         # log images
         if self.global_step % (2 * self.hparams.log_nth_image) == 0:
