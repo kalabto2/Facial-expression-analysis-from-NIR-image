@@ -222,20 +222,18 @@ class DenseUnetGAN(l.LightningModule):
         # =====================================
 
         # log images
-        if self.global_step % (2 * self.hparams.log_nth_image) == 0:
-            grid = make_grid(
-                [
-                    grayscale_to_rgb(x[0]),
-                    y[0],
-                    fake_y[0],
-                ],
-                nrow=3,
-            )
-            self.logger.experiment.add_image(
-                "generated_images", grid, self.global_step / 2
-            )
+        # if self.global_step % (2 * self.hparams.log_nth_image) == 0:
+        grid = make_grid(
+            [
+                grayscale_to_rgb(x[0]),
+                y[0],
+                fake_y[0],
+            ],
+            nrow=3,
+        )
+        self.logger.experiment.add_image("generated_images", grid, self.global_step / 2)
 
-            # log
+        # log
         self.log_dict(
             {
                 "gen_col_loss": color_loss_2,
@@ -260,12 +258,11 @@ class DenseUnetGAN(l.LightningModule):
         self.log_dict(eval_metrics_y)
 
         # log one image
-        if self.global_step % (2 * 50) == 0:
-            self.log_image(
-                [grayscale_to_rgb(x[0]), y[0], fake_y[0]],
-                3,
-                "test",
-            )
+        self.log_image(
+            [grayscale_to_rgb(x[0]), y[0], fake_y[0]],
+            3,
+            "test",
+        )
 
         # calculate losses for discriminator
         d_loss_real = self.discriminator_loss(d_real, torch.ones_like(d_real))
@@ -293,12 +290,11 @@ class DenseUnetGAN(l.LightningModule):
         self.log_dict(eval_metrics_y)
 
         # log one image
-        if self.global_step % (2 * 50) == 0:
-            self.log_image(
-                [grayscale_to_rgb(x[0]), y[0], fake_y[0]],
-                3,
-                "val",
-            )
+        self.log_image(
+            [grayscale_to_rgb(x[0]), y[0], fake_y[0]],
+            3,
+            "val",
+        )
 
         # calculate losses for discriminator
         d_loss_real = self.discriminator_loss(d_real, torch.ones_like(d_real))

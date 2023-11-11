@@ -11,6 +11,8 @@ from skeleton.models.CycleGAN import CycleGAN
 
 from lightning.pytorch.loggers import TensorBoardLogger
 
+from skeleton.models.DenseUnetGAN import DenseUnetGAN
+
 
 @click.command()
 @click.option("--model_checkpoint_fp", type=pathlib.Path, help="TBD")
@@ -24,6 +26,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 )
 @click.option("--onnx_fp", type=pathlib.Path, default=None)
 @click.option("--use_gpu", type=bool, help="TBD")
+@click.option("--model_type", type=str, help="TBD")
 def main(
     model_checkpoint_fp: pathlib.Path,
     model_hparams_fp: pathlib.Path,
@@ -31,6 +34,7 @@ def main(
     mode: str,
     onnx_fp: pathlib.Path,
     use_gpu: bool,
+    model_type: str,
 ):
 
     assert mode in [
@@ -48,15 +52,30 @@ def main(
     print(str_args)
     print("=" * 31)
 
-    save_dir = pathlib.Path("experiments", "logs")
-    name = "CycleGAN_model_logger-tests"
-    version = datetime.now().strftime(list(model_checkpoint_fp.parts)[-3])
+    model = None
 
-    model = CycleGAN.load_from_checkpoint(
-        checkpoint_path=model_checkpoint_fp,
-        hparams_file=model_hparams_fp,
-        map_location=None,
-    )
+    if model_type == "cyclegan":
+        save_dir = pathlib.Path("experiments", "logs")
+        name = "CycleGAN_model_logger-tests"
+        version = datetime.now().strftime(list(model_checkpoint_fp.parts)[-3])
+
+        model = CycleGAN.load_from_checkpoint(
+            checkpoint_path=model_checkpoint_fp,
+            hparams_file=model_hparams_fp,
+            map_location=None,
+        )
+    elif model_type == "denseunet":
+        save_dir = pathlib.Path("experiments", "logs")
+        name = "DenseUnetGAN_model_logger-tests"
+        version = datetime.now().strftime(list(model_checkpoint_fp.parts)[-3])
+
+        model = DenseUnetGAN.load_from_checkpoint(
+            checkpoint_path=model_checkpoint_fp,
+            hparams_file=model_hparams_fp,
+            map_location=None,
+        )
+    else:
+        raise NotImplementedError("only 'cyclegan' and 'denseunet' values possible.")
 
     dm = OuluCasiaDataModule(test_split_fp=test_split_fp)
 
