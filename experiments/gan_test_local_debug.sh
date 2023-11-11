@@ -13,6 +13,7 @@ echo "PROJECT_HOME directory: $PROJECT_HOME"
 # ================= PARAMETERS =================
 use_gpu=0
 mode='test-onnx'
+model_type='cyclegan'
 
 # ------------------ MODEL ---------------------
 model_checkpoint_fp=$PROJECT_HOME'experiments/logs/CycleGAN_model_logger/version_2023_09_12___12_31_14/checkpoints/7-64.ckpt'
@@ -31,4 +32,5 @@ python3 $PROJECT_HOME./gan_cli_test.py --model_checkpoint_fp $model_checkpoint_f
                                 --test_split_fp $test_split_fp \
                                 --use_gpu $use_gpu \
                                 --mode $mode \
-                                --onnx_fp $onnx_fp
+                                --onnx_fp $onnx_fp \
+                                --model_type $model_type
