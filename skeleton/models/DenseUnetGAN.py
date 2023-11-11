@@ -109,7 +109,17 @@ class DenseUnetGAN(l.LightningModule):
     @staticmethod
     def weights_init(model, std=0.02):
         for name, param in model.named_parameters():
-            param.data.normal_(mean=0.0, std=std)
+            if name.endswith(".bias"):
+                param.data.fill_(0)
+            elif param.dim() >= 2:
+                if name.startswith(
+                    "layers.0"
+                ):  # The first layer does not have ReLU applied on its input
+                    param.data.normal_(0, 1 / math.sqrt(param.shape[1]))
+                else:
+                    param.data.normal_(0, math.sqrt(2) / math.sqrt(param.shape[1]))
+            else:
+                param.data.normal_(mean=0.0, std=std)
 
     def configure_optimizers(self):
         opt_g = torch.optim.Adam(
