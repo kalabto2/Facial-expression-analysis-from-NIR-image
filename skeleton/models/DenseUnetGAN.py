@@ -72,7 +72,7 @@ class DenseUnetGAN(l.LightningModule):
         self.image_evaluator = ImageEvaluator(device=device)
 
     def forward(self, x):
-        return self.gen(x)
+        return self.gen(x[0].unsqueeze(0).unsqueeze(0))
 
     def calculate_loss(self, fake_y, y, d_real, d_fake):
         # prepare Gaussian kernel for color loss
