@@ -10,3 +10,7 @@ skeleton/__pycache__/
 /notebooks/
 /_old/
 /.ipynb_checkpoints/
+/models/_old_or_other
+/models/*/_old_or_other
+/models/*/*/_old_or_other
+
