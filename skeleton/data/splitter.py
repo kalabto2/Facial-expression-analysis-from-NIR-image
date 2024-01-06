@@ -42,9 +42,17 @@ class DatasetSplitter:
     @staticmethod
     def pick_samples(list_of_samples, n_picked):
         # pick sample images for train set
+        # picked_samples = random.sample(
+        #     list_of_samples,
+        #     n_picked,
+        # )
+
         picked_samples = random.sample(
-            list_of_samples,
-            n_picked,
+            list_of_samples[: len(list_of_samples) // 2],
+            1,
+        ) + random.sample(
+            list_of_samples[len(list_of_samples) // 2 :],
+            n_picked - 1,
         )
 
         return picked_samples, list(set(list_of_samples) - set(picked_samples))
