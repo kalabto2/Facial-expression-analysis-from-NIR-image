@@ -8,6 +8,7 @@ tensorboard==2.13.0
 lightning==2.0.4
 torchvision==0.15.2
 onnx==1.15.0
+onnxruntime==1.16.1
 
 # always useful in any data science project (but not required)
 numpy  # ~=1.24.2
