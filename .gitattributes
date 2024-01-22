@@ -1,0 +1,1 @@
+zips_and_agreements/*.zip filter=lfs diff=lfs merge=lfs -text
