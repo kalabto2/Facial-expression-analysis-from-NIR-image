@@ -1,12 +1,19 @@
+# Ignore Data Folder
 /data/
+
+# Ignore virtual environment
 /venv*
-/.idea/
+
+# Ignore some development folders
 /experiments/logs/
-skeleton/data/__pycache__/
-skeleton/models/__pycache__/
-skeleton/__pycache__/
 /notebooks/
-/.ipynb_checkpoints/
+
+# Ignore Jetbrains cache
+**/__pycache__/
+/.idea/
+
+# Ignore Jupyter notebook Checkpoints
+**/.ipynb_checkpoints/**
 
 # Ignore old or other content - starting with '_'
 **/_*/**
