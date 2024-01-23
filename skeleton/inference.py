@@ -8,6 +8,13 @@ import cv2
 import datetime
 import onnx
 import os
+from PIL import Image
+from torchvision import transforms
+from pathlib import Path
+import glob
+import math
+import gc
+import matplotlib.pyplot as plt
 
 from skeleton.models import CycleGAN, DenseUnetGAN
 from skeleton.models.utils import (
@@ -16,13 +23,7 @@ from skeleton.models.utils import (
     save_tensor_images,
 )
 
-from PIL import Image
-from torchvision import transforms
-from pathlib import Path
-import glob
-import math
-
-import gc
+from IPython.display import display
 
 
 
@@ -54,6 +55,110 @@ def extract_square_roi(image, x, y, w, h):
 
 def is_image(f_name: str):
     return f_name.split('.')[-1] in ['png', 'bmp', 'jpg', 'jpeg']
+
+def plot_point_on_circumplex_model(axs, circumplex_image, valence, arousal, point_color='blue'):
+    # Convert to pixel coordinates
+    width, height = circumplex_image.size
+    pct = 0.92
+    padding = (1-pct) / 2
+    x = (valence * pct + 1) / 2 * (width - 2 * padding * width) + padding * width
+    pct = 0.955
+    padding = (1-pct) / 2
+    y = (1 - (arousal * pct + 1) / 2) * (height - 2 * padding * height) + padding * height  # Flip y-axis
+    x += 0.003 * width
+    # Plot the point
+    axs[1].plot(x, y, 'ro', color=point_color)
+
+def show_dashboard(image_np_array, predictions, target=None, save_dashboard_fp=None):
+    circ_fp = 'skeleton/images/VAmodel.png'
+    im_trgt_size = (720,720)
+    font = {
+            'family': 'serif',
+            'color':  'darkblue',
+            'weight': 'normal',
+            'size': 16,
+        }
+    font_heading = {
+            'family': 'serif',
+            'color':  'darkblue',
+            'weight': 'normal',
+            'size': 26,
+        }
+    emotions = ['neutral', 'happy', 'sad', 'surprise', 'fear', 'disgust', 'anger', 'contempt']
+    
+    # -----------
+    
+    # Load the images
+    face_image = Image.fromarray(image_np_array)  # Image.open(image_fp)
+    circumplex_image = Image.open(circ_fp)
+    
+    # Resize the images
+    face_image = face_image.resize(im_trgt_size)
+    circumplex_image = circumplex_image.resize(im_trgt_size)
+    
+    # Create a figure with a light gray background
+    fig, axs = plt.subplots(1, 3, figsize=(20, 10), gridspec_kw={'width_ratios': [4, 4, 1]})
+    fig.patch.set_facecolor('lightgray')
+    
+    # Add padding around the images
+    plt.subplots_adjust(wspace=0.05, hspace=0.05)
+
+    # Add the face image to the left
+    axs[0].imshow(face_image)
+    axs[0].axis('off')  # Hide axes
+
+    # Add the circumplex image to the middle
+    axs[1].imshow(circumplex_image)
+    axs[1].axis('off')  # Hide axes
+    
+    # Define predictions
+    predicted_valence = predictions[1][0]
+    predicted_arousal = predictions[1][1]
+    predicted_percentages = [100 * p for p in predictions[0]]
+    prediction = np.argmax(predicted_percentages)
+    
+    # Display predicted valence arousal label
+    plot_point_on_circumplex_model(axs, circumplex_image, predicted_valence, predicted_arousal)
+    
+    # Add progress bars to the right
+    bars = axs[2].barh(emotions, predicted_percentages, color='darkblue', height=0.5)
+    axs[2].set_xlim(0, 100)
+    axs[2].invert_yaxis()  # labels read top-to-bottom
+    axs[2].axis('off')  # Hide axes
+    axs[2].patch.set_visible(False)  # Make background transparent
+    
+    # Add percentages on the bars
+    for bar, percentage, emotion in zip(bars, predicted_percentages, emotions):
+        width = bar.get_width()
+        axs[2].text(width, bar.get_y() + bar.get_height()/2, f' {percentage:.3f}%', ha='left', va='center')
+        axs[2].text(0, bar.get_y() - 0.16, f'{emotion}', ha='left', va='center', fontdict=font)
+        
+    # Add heading of predicted emotion and valence arousal values
+    axs[0].text(10,-20, 'pred: ', fontdict=font_heading)
+    font_heading['color'] = ('darkgreen' if prediction == target[0] else 'darkred') if target else font_heading['color']
+    if target:
+        target_eval = f" | TOP {sorted(predicted_percentages, reverse=True).index(target[0])+1}"
+    else:
+        target_eval = ""
+    axs[0].text(130,-20, str(emotions[prediction]).upper() + target_eval, fontdict=font_heading)
+    axs[1].text(10, -20, f"valence: {predicted_valence:.3f} | arousal: {predicted_arousal:.3f}", fontdict=font)
+    
+    if target:
+        font_heading['color'] = 'darkgreen'
+        font['color'] = 'darkgreen'
+        axs[0].text(10,height + 40, 'actual: ' + str(emotions[target[0]]).upper(), fontdict=font_heading)
+        axs[1].text(10, height + 40, f"valence: {target[1][0]:.3f} | arousal: {target[1][1]:.3f}", fontdict=font)
+        plot_point_on_circumplex_model(axs, circumplex_image, target[1][0], target[1][1], point_color='green')
+
+    # Save the dashboard as an image
+    if save_dashboard_fp:
+        path = os.path.split(save_dashboard_fp)[0]
+        if path:
+            os.makedirs(path, exist_ok=True)
+        plt.savefig(save_dashboard_fp, bbox_inches='tight', pad_inches=0.1, transparent=True)
+    
+    display(fig)
+    return axs
 
 class MobileNet(object):
     emotion_labels_list = ["Neutral", "Happy", "Sad", "Surprise", "Fear", "Disgust", "Anger", "Contempt", "None"]
@@ -170,16 +275,23 @@ class MobileNet(object):
 
         return a
     
-    def interpret_output(self, output):        
-        for i, (em, pred_val) in enumerate(sorted(zip(MobileNet.emotion_labels_list, output[0][0]), key=lambda x: x[1], reverse=True)):
-            print(f"{em.upper() if i == 0 else em}: {pred_val:.3f}")
-        
+    def interpret_output(self, image, output):
         valence = (output[1][0][0] - 0.5) * 2
         arousal = (output[1][0][1] - 0.5) * 2
-        
         if self.square2circ:
             valence, arousal = self.square2circumplex([valence, arousal])
-        print(f"VALENCE/AROUSAL: {valence:.3f} / {arousal:.3f}")
+            
+        predictions = [output[0][0], [valence, arousal]]
+        show_dashboard(image, predictions, target=None, save_dashboard_fp=None)
+        
+        # DISPLAY PREDICTIONS WITH ONLY TEXT OUTPUT - OLD
+        # -----------------------------------------------
+        # for i, (em, pred_val) in enumerate(sorted(zip(MobileNet.emotion_labels_list, output[0][0]), key=lambda x: x[1], reverse=True)):
+        #     print(f"{em.upper() if i == 0 else em}: {pred_val:.3f}")
+        
+        # valence = (output[1][0][0] - 0.5) * 2
+        # arousal = (output[1][0][1] - 0.5) * 2
+        # print(f"VALENCE/AROUSAL: {valence:.3f} / {arousal:.3f}")
 
     def __call__(self, image: Union[str | np.ndarray]):
         if isinstance(image, str):
@@ -194,11 +306,13 @@ class MobileNet(object):
         output = self.run(image)
 
         if self.debug:
-            try:
-                display(Image.fromarray(image))
-            except:
-                "__Could not display image__"
-            self.interpret_output(output)
+            # OLD - WHEN NOT USING DASHBOARD
+            # ------------------------------
+            # try:
+            #     display(Image.fromarray(image))
+            # except:
+            #     "__Could not display image__"
+            self.interpret_output(image, output)
 
         return output
     
@@ -443,7 +557,6 @@ class Orig_CycleGAN:
 # Author's GitHub: https://github.com/Star-Clouds/CenterFace
 ###############################
 
-
 class CenterFace(object):
     def __init__(self, landmarks=True):
         self.input_shape = (224, 224)
@@ -612,8 +725,8 @@ class CenterFace(object):
                 if ovr >= nms_thresh:
                     suppressed[j] = True
 
-        return keep
-    
+        return keep        
+
 class Inference:
     # net types
     class net_type(Enum):
@@ -788,25 +901,17 @@ class Inference:
         folder = pathlib.Path(folder)
         detected = []
         i = 0
-        go=False
         
         for root, dirs, imgs in sorted(os.walk(str(folder)), key=lambda x: x[0]):
-            for img in sorted(imgs):
-                if not go:
-                    if img == '44906.jpg':
-                        go = True
-                    if not go:
-                        continue
-                    
+            for img in sorted(imgs):                    
                 if img.split('.')[-1] not in ['png', 'bmp', 'jpeg', 'jpg']:
                     print(f'skipping {str(pathlib.Path(root) / img)} - not "png", "jpg", "jpeg" or "bmp"')
                     continue
                 print(str(pathlib.Path(root) / img))
                 detected.append(func(pathlib.Path(root) / img, None))
                 
-                if i%50 == 0:
-                    collected = gc.collect()
-                    print(f"gc: collected {collected} objects")
+                if i%10 == 0:
+                    gc.collect()
                 
                 i+=1
 
