@@ -1,16 +1,12 @@
 /data/
 /venv*
 /.idea/
-/experiments/old_logs/
 /experiments/logs/
 skeleton/data/__pycache__/
 skeleton/models/__pycache__/
 skeleton/__pycache__/
-/old_code/
 /notebooks/
-/_old/
 /.ipynb_checkpoints/
-/models/_old_or_other
-/models/*/_old_or_other
-/models/*/*/_old_or_other
 
+# Ignore old or other content - starting with '_'
+**/_*/**
