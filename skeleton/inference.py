@@ -160,6 +160,32 @@ def show_dashboard(image_np_array, predictions, target=None, save_dashboard_fp=N
     display(fig)
     return axs
 
+def enlarge_detected_face(orig_image_np, detected_obj, target_size):
+    out_objs = []
+    
+    for obj in detected_obj:
+        x_s = int(obj['facial_area']['x'])
+        y_s = int(obj['facial_area']['y'])
+        x_e = int(obj['facial_area']['w'] + obj['facial_area']['x'])
+        y_e = int(obj['facial_area']['h'] + obj['facial_area']['y'])
+        width = int(obj['facial_area']['w'])
+        height = int(obj['facial_area']['h'])
+        bigger_dimension = max([width, height])
+        width_padding = bigger_dimension - width
+        height_padding = bigger_dimension - height
+#         face = orig_image_np[int(y_s-height_padding//2):int(y_e+height_padding//2),
+#                             int(x_s-width_padding//2):int(x_e+width_padding//2), :]
+        ys = max(0, int(y_s-height_padding//2))
+        ye = min(orig_image_np.shape[0], int(y_e+height_padding//2))
+        xs = max(0, int(x_s-width_padding//2))
+        xe = min(orig_image_np.shape[1], int(x_e+width_padding//2))
+        face = orig_image_np[ys:ye,xs:xe, :]
+        face = cv2.resize(face, target_size).astype(np.uint8)
+        out_obj = {'face': face, "facial_area": obj["facial_area"], "confidence": obj["confidence"]}
+        out_objs.append(out_obj)
+
+    return out_objs
+
 class MobileNet(object):
     emotion_labels_list = ["Neutral", "Happy", "Sad", "Surprise", "Fear", "Disgust", "Anger", "Contempt", "None"]
     emotion_labels_dict = {0: "Neutral",1: "Happy",2: "Sad",3: "Surprise",4: "Fear",5: "Disgust",6: "Anger",7: "Contempt",8: "None",}
@@ -830,6 +856,18 @@ class Inference:
                 # adjust the output
                 for f in face_objs:
                     f['face'] = (f['face'] * 255).astype(np.uint8)
+                    
+                # remove blackstripes
+                if self.models["face_detector"]["remove_black_stripes"]:
+                    # load if not loaded
+                    if image_np_arr is None:
+                        image_np_arr = cv2.imread(str(image_fp))
+                        image_np_arr = cv2.cvtColor(image_np_arr, cv2.COLOR_BGR2RGB)
+
+                    # expects 3 channels
+                    if image_np_arr.shape[2] == 1:
+                        image_np_arr = np.concatenate([image_np_arr] * 3, axis=-1)
+                    face_objs = enlarge_detected_face(image_np_arr, face_objs, (224, 224))
                 
                 return face_objs
 
@@ -854,6 +892,10 @@ class Inference:
                         'facial_area': {'x': det[0], 'y': det[1], 'w': det[2] - det[0], 'h': det[3] - det[1]},
                         'confidence': det[4]
                     })
+
+                # remove blackstripes
+                if self.models["face_detector"]["remove_black_stripes"]:
+                    output = enlarge_detected_face(image_np_arr, output, (224, 224))
 
                 return output
             else:
@@ -889,7 +931,9 @@ class Inference:
     # ==============================================================================
     def _from_array(self, images, func):
         detected = []
-        for image in images:
+        for i, image in enumerate(images):
+            if self.verbose:
+                print(f"#{i} processing")
             if isinstance(image, list):
                 detected.append(self._from_array(image, func))
             else:
@@ -919,7 +963,9 @@ class Inference:
                 
     def _from_filenames(self, images: np.array, func):
         detected = []
-        for image in images:
+        for i, image in enumerate(images):
+            if self.verbose:
+                print(f"#{i} - processing: {image}")
             detected.append(func(image, None))
         return detected
     
@@ -956,7 +1002,7 @@ class Inference:
             in2 = x if func == self._from_array else None
             
             if self.face_detector_model is not None:
-                x = [f['face'] for f in self.detect_faces(in1, in2)] 
+                x = [f['face'] for f in self.detect_faces(in1, in2)]
             if self.spectrum_transfer_model is not None:
                 if self.face_detector_model is None:
                     x = [self.translate_spectra(in1, in2)]
@@ -981,6 +1027,8 @@ class Inference:
             return x
         
         output = func(content, _stacked_fns)
+        
+        return output
     
     # ==============================================================================
     # =========================== CALLABLE FROM OUTSIDE ============================
