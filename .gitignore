@@ -1,6 +1,9 @@
 # Ignore Data Folder
 /data/
 
+# Ignore CustomDB data in Custom_DB/
+/Custom_DB/custom_nir/
+
 # Ignore virtual environment
 /venv*
 
