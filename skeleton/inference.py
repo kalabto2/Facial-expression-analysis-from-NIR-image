@@ -795,6 +795,8 @@ class Inference:
         self.spectrum_transfer_model = None
         self.fer_model = None
         self.face_detector_model = None
+        
+        self.num_detect_faces_run = 0
 
         # set models up
         if models["face_detector"]["net_type"]:
@@ -869,7 +871,7 @@ class Inference:
                         image_np_arr = np.concatenate([image_np_arr] * 3, axis=-1)
                     face_objs = enlarge_detected_face(image_np_arr, face_objs, (224, 224))
                 
-                return face_objs
+                output = face_objs
 
             elif self.models["face_detector"]["net_type"] == Inference.net_type.FACE_DETECTOR_CENTERFACE:
                 # load if not loaded
@@ -892,14 +894,31 @@ class Inference:
                         'facial_area': {'x': det[0], 'y': det[1], 'w': det[2] - det[0], 'h': det[3] - det[1]},
                         'confidence': det[4]
                     })
-
-                # remove blackstripes
-                if self.models["face_detector"]["remove_black_stripes"]:
-                    output = enlarge_detected_face(image_np_arr, output, (224, 224))
-
-                return output
             else:
                 raise NotImplementedError
+            
+            # remove blackstripes
+            if self.models["face_detector"]["remove_black_stripes"]:
+                output = enlarge_detected_face(image_np_arr, output, (224, 224))
+            
+            # display image
+            if self.models["face_detector"]["display_images"]:
+                display(Image.fromarray(output[0]["face"]))
+                
+            # save images
+            if self.models['face_detector']['save_image_to_folder']:
+                os.makedirs(self.models['face_detector']['save_image_to_folder'],exist_ok=True)
+                im_arr = output[0]['face']
+                if image_fp:
+                    fn = Path(image_fp).name
+                else:
+                    fn = str(self.num_detect_faces_run) + '.jpg'
+                Image.fromarray(im_arr).save(os.path.join(self.models['face_detector']['save_image_to_folder'], fn))
+            
+            self.num_detect_faces_run += 1
+            
+            return output
+            
         except Exception as e:
                 print(f"ERROR at image {image_fp if image_fp is not None else ''}", e)
                 return None
