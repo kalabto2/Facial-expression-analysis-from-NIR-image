@@ -21,5 +21,5 @@ cd experiments/
 
 Run *Tensorboard* analytic dashboard.
 ```bash
-tensorboard --logdir=experiments/logs --bind_all
+tensorboard --logdir=experiments/logs --bind_all  --samples_per_plugin=images=100
 ```

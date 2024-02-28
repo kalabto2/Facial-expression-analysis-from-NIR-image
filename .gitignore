@@ -1,8 +1,25 @@
+# Ignore Data Folder
 /data/
+
+# Ignore CustomDB data in Custom_DB/
+/Custom_DB/custom_nir/
+
+# Ignore virtual environment
 /venv*
-/.idea/
-/experiments/old_logs/
+
+# Ignore some development folders
 /experiments/logs/
-skeleton/data/__pycache__/
-skeleton/models/__pycache__/
-skeleton/__pycache__/
+/notebooks/
+
+# Ignore Jetbrains cache
+**/__pycache__/
+/.idea/
+
+# Ignore Jupyter notebook Checkpoints
+**/.ipynb_checkpoints/**
+/Custom_DB/.ipynb_checkpoints/
+.ipynb_checkpoints
+Custom_DB/.ipynb_checkpoints/Custom_DB-checkpoint.ipynb
+
+# Ignore old or other content - starting with '_'
+**/_*/**
