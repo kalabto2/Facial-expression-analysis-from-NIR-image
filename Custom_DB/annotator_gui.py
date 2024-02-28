@@ -65,19 +65,19 @@ class GUI:
         happy = tk.Radiobutton(self.root,text="Veselý", variable = self.emo, value=1)
         self.canvas.create_window(1115,570,window=happy)
 
-        angry = tk.Radiobutton(self.root,text="Rozzlobený", variable = self.emo, value=2)
+        angry = tk.Radiobutton(self.root,text="Rozzlobený", variable = self.emo, value=6)
         self.canvas.create_window(1190,570,window=angry)
 
-        sad = tk.Radiobutton(self.root,text="Smutný", variable = self.emo, value=3)
+        sad = tk.Radiobutton(self.root,text="Smutný", variable = self.emo, value=2)
         self.canvas.create_window(1265,570,window=sad)
 
         fear = tk.Radiobutton(self.root,text="Vystrašený", variable = self.emo, value=4)
         self.canvas.create_window(1340,570,window=fear)
 
-        surprise = tk.Radiobutton(self.root,text="Překvapený", variable = self.emo, value=5)
+        surprise = tk.Radiobutton(self.root,text="Překvapený", variable = self.emo, value=3)
         self.canvas.create_window(1430,570,window=surprise)
 
-        disgust = tk.Radiobutton(self.root,text="Znechucený", variable = self.emo, value=6)
+        disgust = tk.Radiobutton(self.root,text="Znechucený", variable = self.emo, value=5)
         self.canvas.create_window(1520,570,window=disgust)
 
         contempt = tk.Radiobutton(self.root,text="Pohrdavý", variable = self.emo, value=7)
