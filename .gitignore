@@ -1,0 +1,14 @@
+# Ignore all modules
+/venv*
+
+# Ignore old or other content - those are starting with '_'
+**/_*/**
+
+# Ignore .ipynb_checkpoints
+**/.ipynb_checkpoints/**
+
+# Ignore pycache
+**/__pycache__/
+
+# Exclude models - checkpoints
+# /model/

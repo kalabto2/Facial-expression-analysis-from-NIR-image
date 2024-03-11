@@ -1,0 +1,16 @@
+tensorflow
+pandas
+numpy
+matplotlib
+opencv-python
+scipy
+joblib
+seaborn
+tqdm
+scikit-learn
+optuna
+optuna-integration
+plotly
+joblib
+tf2onnx
+ipykernel
