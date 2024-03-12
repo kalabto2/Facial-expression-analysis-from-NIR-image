@@ -2,6 +2,10 @@
 
 ***
 
+> This branch contains code for models DenseUnet and CycleGAN. Although CycleGAN was used in develeopment, this particular code was not, however, it should be working.
+
+## Setting up
+
 Prepare virtual environment.
 ```bash
 virtualenvironment venv
