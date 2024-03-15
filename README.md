@@ -2,7 +2,7 @@
 
 ***
 
-> This branch contains: trained spectrum translation models, inference code and data related code.
+> This branch contains: trained spectrum translation models, inference code, Custom_DB and data related code.
 
 ## Content
 * *annotations_splits/* - folder containing data CSV annotations and other data for images in available databases
