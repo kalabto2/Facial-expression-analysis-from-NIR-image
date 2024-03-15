@@ -1,7 +1,17 @@
+"""
+#### CODE FROM ORIGINAL WORK ####
+Code adjusted for this project.
+author: Martin Vadlejch
+source: https://gitlab.fit.cvut.cz/vadlemar/real-time-facial-expression-recognition-in-the-wild/-/blob/master/src/confusion_matrix_pretty_print.py
+"""
+
 from datetime import datetime
 import tkinter as tk
 from PIL import ImageTk,Image
 import pandas as pd
+
+
+
 class GUI:
     def __init__(self):
         self.root = None

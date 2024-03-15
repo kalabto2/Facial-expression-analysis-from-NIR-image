@@ -16,6 +16,9 @@ import math
 import gc
 import matplotlib.pyplot as plt
 from IPython.display import display
+import copy
+import io
+
 
 
 
@@ -144,13 +147,20 @@ def show_dashboard(image_np_array, predictions, target=None, save_dashboard_fp=N
 
     # Save the dashboard as an image
     if save_dashboard_fp:
-        path = os.path.split(save_dashboard_fp)[0]
-        if path:
-            os.makedirs(path, exist_ok=True)
+        os.makedirs(path, exist_ok=True)
         plt.savefig(save_dashboard_fp, bbox_inches='tight', pad_inches=0.1, transparent=True)
     
     display(fig)
-    return axs
+    
+    img_buf = io.BytesIO()
+    plt.savefig(img_buf, format='jpg')
+
+    im = Image.open(img_buf)
+#     im.show(title="My Image")
+
+    img_buf.close()
+    
+    return plt #Image.frombytes('RGB', fig.canvas.get_width_height(),fig.canvas.tostring_rgb())
 
 def enlarge_detected_face(orig_image_np, detected_obj, target_size):
     out_objs = []
@@ -193,7 +203,6 @@ class MobileNet(object):
         verbose=False,
         debug=False,
         resize_strategy=ResizeStrategy.FILL_BLACK,
-        square2circ=True,
     ):
         self.mobilenet_input_shape = None
         self.mobilenet = None
@@ -201,7 +210,8 @@ class MobileNet(object):
         self.verbose = verbose
         self.debug = debug
         self.resize_strategy = resize_strategy
-        self.square2circ = square2circ
+        
+        self.num_recognized_images = 0
 
         self.load_model()
 
@@ -296,11 +306,18 @@ class MobileNet(object):
     def interpret_output(self, image, output):
         valence = (output[1][0][0] - 0.5) * 2
         arousal = (output[1][0][1] - 0.5) * 2
-        if self.square2circ:
-            valence, arousal = self.square2circumplex([valence, arousal])
-            
         predictions = [output[0][0], [valence, arousal]]
-        show_dashboard(image, predictions, target=None, save_dashboard_fp=None)
+
+#         if self.save_image_to_folder:
+#             save_fp = str(self.num_recognized_images) + "_" + str(i) + '.jpg'
+#         else:
+#             save_fp = None
+        
+        dashboard_figure = show_dashboard(image, predictions, target=None, save_dashboard_fp=None)
+        
+        self.num_recognized_images += 1
+        
+        return dashboard_figure
         
         # DISPLAY PREDICTIONS WITH ONLY TEXT OUTPUT - OLD
         # -----------------------------------------------
@@ -330,9 +347,11 @@ class MobileNet(object):
             #     display(Image.fromarray(image))
             # except:
             #     "__Could not display image__"
-            self.interpret_output(image, output)
+            dashboard_figure = self.interpret_output(image, output)
+        else:
+            dashboard_figure = None
 
-        return output
+        return output, dashboard_figure
     
     
 def infer_from_folder(folder: str, func):
@@ -570,6 +589,7 @@ class Orig_CycleGAN:
                 "__Could not display image__"
 
         return predicted_image, orig_image
+
 ###############################
 # CenterFace Facial Detector - slightly adjusted
 # Author's GitHub: https://github.com/Star-Clouds/CenterFace
@@ -579,10 +599,8 @@ class CenterFace(object):
     def __init__(self, landmarks=True):
         self.input_shape = (224, 224)
         self.landmarks = landmarks
-        if self.landmarks:
-            self.net = cv2.dnn.readNetFromONNX("models/pretrained/centerface.onnx")
-        else:
-            self.net = cv2.dnn.readNetFromONNX("models/pretrained/cface.1k.onnx")
+
+        self.net = cv2.dnn.readNetFromONNX("models/face_detection/centerface.onnx")
         self.img_h_new, self.img_w_new, self.scale_h, self.scale_w = 0, 0, 0, 0
 
     def __call__(self, img, threshold=0.5):
@@ -813,19 +831,21 @@ class Inference:
             self.spectrum_transfer_model = FFE_CycleGAN(model["pth_to_onnx"], \
                                                         input_as_avg_grayscale=self.models["spectrum_translator"]["input_as_avg_grayscale"], \
                                                         output_as_gray=self.models["spectrum_translator"]["output_as_avg_grayscale"], \
-                                                        verbose=self.verbose, debug=self.debug)
+                                                        verbose=self.verbose, debug=self.models["spectrum_translator"]["display_images"])
         elif model['net_type'] == Inference.net_type.SPECTRUM_TRANSLATOR_ORIG_CYCLEGAN:    
             self.spectrum_transfer_model = Orig_CycleGAN(model["pth_to_onnx"], \
                                                          input_as_avg_grayscale=self.models["spectrum_translator"]["input_as_avg_grayscale"], \
                                                          output_as_gray=self.models["spectrum_translator"]["output_as_avg_grayscale"], \
-                                                         verbose=self.verbose, debug=self.debug)
+                                                         verbose=self.verbose, debug=self.models["spectrum_translator"]["display_images"])
         else:
             raise NotImplementedError
             
     def _setup_fer_model(self, model: dict()):
         print(f"Using '{model}' as FER model")
         if model["net_type"] == Inference.net_type.FER_MOBILENET:
-            self.fer_model = MobileNet(model["pth_to_onnx"], verbose=self.debug, debug=self.debug, resize_strategy=MobileNet.ResizeStrategy.FILL_BLACK, square2circ=model["va_to_circumplex_model"])
+            self.fer_model = MobileNet(model["pth_to_onnx"], verbose=self.verbose,
+                                       debug=self.models["fer"]["display_images"],
+                                       resize_strategy=MobileNet.ResizeStrategy.FILL_BLACK)
         else:
             raise NotImplementedError
 
@@ -844,7 +864,7 @@ class Inference:
                     target_size=(224,224),
                     detector_backend="retinaface",
                     enforce_detection=False,
-                    align=False
+                    align=self.models["face_detector"]["retina_face_align"]
                 )
                 
                 # adjust the output
@@ -893,20 +913,22 @@ class Inference:
             if self.models["face_detector"]["remove_black_stripes"]:
                 output = enlarge_detected_face(image_np_arr, output, (224, 224))
             
-            # display image
-            if self.models["face_detector"]["display_images"]:
-                display(Image.fromarray(output[0]["face"]))
-                
-            # save images
-            if self.models['face_detector']['save_image_to_folder']:
-                os.makedirs(self.models['face_detector']['save_image_to_folder'],exist_ok=True)
-                im_arr = output[0]['face']
-                if image_fp:
-                    fn = Path(image_fp).name
-                else:
-                    fn = str(self.num_detect_faces_run) + '.jpg'
-                Image.fromarray(im_arr).save(os.path.join(self.models['face_detector']['save_image_to_folder'], fn))
-            
+            for i, f in enumerate(output):
+                # display image
+                if self.models["face_detector"]["display_images"]:
+                    print('#' + str(i+1) + ' face')
+                    display(Image.fromarray(f["face"]))
+
+                # save images
+                if self.models['face_detector']['save_image_to_folder']:
+                    os.makedirs(self.models['face_detector']['save_image_to_folder'],exist_ok=True)
+                    im_arr = f['face']
+                    if image_fp:
+                        fn = Path(image_fp).stem + "_" + str(i) + Path(image_fp).suffix
+                    else:
+                        fn = str(self.num_detect_faces_run) + "_" + str(i) + '.jpg'
+                    Image.fromarray(im_arr).save(os.path.join(self.models['face_detector']['save_image_to_folder'], fn))
+
             self.num_detect_faces_run += 1
             
             return output
@@ -920,12 +942,7 @@ class Inference:
         image_fp: Optional[pathlib.Path],
         image_np_arr: Optional[np.array],
     ):        
-        if self.models["spectrum_translator"]["net_type"] == Inference.net_type.SPECTRUM_TRANSLATOR_ORIG_CYCLEGAN:
-            output = self.spectrum_transfer_model(image_fp if image_np_arr is None else image_np_arr)
-        elif self.models["spectrum_translator"]["net_type"] == Inference.net_type.SPECTRUM_TRANSLATOR_FFE_CYCLEGAN:
-            output = self.spectrum_transfer_model(image_fp if image_np_arr is None else image_np_arr)
-        else:
-            raise NotImplementedError
+        output = self.spectrum_transfer_model(image_fp if image_np_arr is None else image_np_arr)
 
         return output[0]
     
@@ -1003,9 +1020,8 @@ class Inference:
         
         return face_detector_out, spectrum_translator_out, fer_out
     
-    def _infer_instant(self, content, func, save_to_folder=None):
-        if save_to_folder:
-            os.makedirs(save_to_folder, exist_ok=True)
+    def _infer_instant(self, content, func):
+
         
         def _stacked_fns(_x1, _x2):
             x = _x1 if _x2 is None else _x2
@@ -1013,29 +1029,52 @@ class Inference:
             in2 = x if func == self._from_array else None
             
             if self.face_detector_model is not None:
-                x = [f['face'] for f in self.detect_faces(in1, in2)]
+                x = [f for f in self.detect_faces(in1, in2)]
+                face_detector_out = copy.deepcopy(x)
+                x = [f["face"] for f in x]
+            else:
+                face_detector_out = None
+            
             if self.spectrum_transfer_model is not None:
                 if self.face_detector_model is None:
                     x = [self.translate_spectra(in1, in2)]
                 else:
                     x = self._from_array(x, self.translate_spectra)
+
+                spectrum_translator_out = copy.deepcopy(x)
                 
+                save_to_folder = self.models["spectrum_translator"]["save_image_to_folder"]
                 if save_to_folder:
-                    idx = len(glob.glob(os.path.join(save_to_folder, "*.png")))
+                    os.makedirs(save_to_folder, exist_ok=True)
+                if save_to_folder:  
+                    os.makedirs(save_to_folder,exist_ok=True)
+                    idx = len(glob.glob(os.path.join(save_to_folder, "*.jpg")))
                     for i, _x in enumerate(x):
-#                         Image.fromarray(_x).save(os.path.join(save_to_folder, f"{idx}_{i}.png"))
-                        ###### TODO ########### AFTER USAGE GET BACK TO COMMENTED CODE
-                        _x, _, _, _, _ = extract_square_roi(_x, 0, 0, _x.shape[1], _x.shape[0])
-                        _x = cv2.resize(_x, (224, 224), interpolation=cv2.INTER_AREA)
-                        Image.fromarray(_x).save(os.path.join(save_to_folder, str(_x1).split('/')[-1]))
+                        Image.fromarray(_x).save(os.path.join(save_to_folder, f"{idx}_{i}.jpg"))
+            else:
+                spectrum_translator_out = None
                 
             if self.fer_model is not None:
                 if self.spectrum_transfer_model is None and self.face_detector_model is None:
                     x = self.fer(in1, in2)
+                    x = [x]
                 else:
                     x = self._from_array(x, self.fer)
+                fer_out = x
+                
+                save_to_folder = self.models["fer"]["save_image_to_folder"]
+                if save_to_folder:                   
+                    os.makedirs(save_to_folder,exist_ok=True)
+                    idx = len(glob.glob(os.path.join(save_to_folder, "*.jpg")))
+                    for i, _x in enumerate(x):
+                        _x_output, plt = _x
+#                         _x_dashboard.save(os.path.join(save_to_folder, f"{idx}_{i}.jpg"))
+                        plt.savefig(str(os.path.join(save_to_folder, f"{idx}_{i}.jpg")), bbox_inches='tight', pad_inches=0.1, transparent=True)
+                
+            else:
+                fer_out = None
             
-            return x
+            return face_detector_out, spectrum_translator_out, fer_out
         
         output = func(content, _stacked_fns)
         
@@ -1045,23 +1084,23 @@ class Inference:
     # =========================== CALLABLE FROM OUTSIDE ============================
     # ==============================================================================
 
-    def infer_from_folder(self, folder: Union[str|pathlib.Path]):
-        return self._infer(folder, self._from_folder)
+#     def infer_from_folder(self, folder: Union[str|pathlib.Path]):
+#         return self._infer(folder, self._from_folder)
         
-    def infer_from_array(self, images: np.array):
-        return self._infer(images, self._from_array)
+#     def infer_from_array(self, images: np.array):
+#         return self._infer(images, self._from_array)
     
-    def infer_from_filenames(self, images: np.array):
-        return self._infer(images, self._from_filenames)
+#     def infer_from_filenames(self, images: np.array):
+#         return self._infer(images, self._from_filenames)
     
-    def infer_instant_from_folder(self, folder: Union[str|pathlib.Path], save_to_folder: Optional[str]=None):
-        return self._infer_instant(folder, self._from_folder, save_to_folder)
+    def infer_instant_from_folder(self, folder: Union[str|pathlib.Path]):
+        return self._infer_instant(folder, self._from_folder)
     
-    def infer_instant_from_array(self, images: np.array, save_to_folder: Optional[str]=None):
-        return self._infer_instant(images, self._from_array, save_to_folder)
+    def infer_instant_from_array(self, images: np.array):
+        return self._infer_instant(images, self._from_array)
     
-    def infer_instant_from_filenames(self, images: np.array, save_to_folder: Optional[str]=None):
-        return self._infer_instant(images, self._from_filenames, save_to_folder)
+    def infer_instant_from_filenames(self, images: np.array):
+        return self._infer_instant(images, self._from_filenames)
         
     # -------------------------------------------------------------------------------
 

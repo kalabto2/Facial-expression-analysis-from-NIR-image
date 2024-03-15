@@ -1,7 +1,17 @@
+"""
+#### CODE FROM ORIGINAL WORK ####
+Code adjusted for this project.
+author: Martin Vadlejch
+source: https://gitlab.fit.cvut.cz/vadlemar/real-time-facial-expression-recognition-in-the-wild/-/blob/master/src/confusion_matrix_pretty_print.py
+"""
+
 from datetime import datetime
 import tkinter as tk
 from PIL import ImageTk,Image
 import pandas as pd
+
+
+
 class GUI:
     def __init__(self):
         self.root = None
@@ -108,9 +118,6 @@ class Annotator:
         val = []
         aro = []
         for i in range(0,len(self.df)):
-            if i<50:
-                print("skipping",i)
-                continue
             print(i)           
             (tmp_emo,tmp_val,tmp_aro) = self.GUI.annotate_image(self.df.filename[i],
                     self.df.gender[i], self.df.adult[i], self.df.race[i], i+1,len(self.df) )
@@ -123,7 +130,7 @@ class Annotator:
             self.df.loc[i, "valence"] = tmp_val
             self.df.loc[i, "arousal"] = tmp_aro
             # Save the DataFrame to a CSV file
-            self.df.to_csv('custom_nir-annotations.csv', index=False)
+            self.df.to_csv('custom_nir-annotations2.csv', index=False)
             
         self.df["expression"]=emo
         self.df["valence"]=val
