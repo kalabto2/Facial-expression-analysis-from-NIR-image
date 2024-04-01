@@ -8,6 +8,7 @@
 * *annotations_splits/* - folder containing data CSV annotations and other data for images in available databases
 * *Custom_DB/* - contains code, images and annotations of *CUSTOM_DB*
 	* *annotator_gui.py*, *annotator_gui_EN.py* - GUI annotator of custom data
++ *CustomMorphSet/* - contains code, setup guide and images of *CustomMorphSet*
 * *data/* - empty folder where all ata should be placed
 * *models/* - folder contains trained models in *onnx* format
 	*  *models/face_detection/centerface.onnx*
@@ -38,4 +39,5 @@ Also, folder *data/* should contain necessary data.
 * CASIA2.0
 * BUAA
 * Custom_DB
+* CustomMorphSet
 
