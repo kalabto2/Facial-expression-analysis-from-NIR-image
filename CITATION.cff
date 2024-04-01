@@ -1,7 +1,8 @@
-@software{Kalabis_Facial_Expression_Analysis_from_NIR_images_software_2024,
-  author = {Kalabis, Tomas},
-  month = {5},
-  title = {{Facial Expression Analysis from NIR images software}},
-  url = {https://github.com/kalabto2/Facial-expression-analysis-from-NIR-image},
-  year = {2024}
-}
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Kalabis"
+  given-names: "Tomas"
+title: "Facial Expression Analysis from NIR images software Software"
+date-released: 2024-5-1
+url: "https://github.com/kalabto2/Facial-expression-analysis-from-NIR-image"
