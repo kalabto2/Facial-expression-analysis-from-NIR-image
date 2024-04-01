@@ -1,0 +1,7 @@
+@software{Kalabis_Facial_Expression_Analysis_from_NIR_images_software_2024,
+  author = {Kalabis, Tomas},
+  month = {5},
+  title = {{Facial Expression Analysis from NIR images software}},
+  url = {https://github.com/kalabto2/Facial-expression-analysis-from-NIR-image},
+  year = {2024}
+}
