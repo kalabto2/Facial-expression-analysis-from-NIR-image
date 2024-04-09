@@ -241,7 +241,7 @@ class MobileNet(object):
     def run(self, image):
         output = self.mobilenet.run(
             None,
-            {"x": np.expand_dims(image, axis=0).astype(np.float32)/255},
+            {self.mobilenet_input_name: np.expand_dims(image, axis=0).astype(np.float32)/255},
         )
 
         return output
@@ -890,7 +890,7 @@ class Inference:
                 if image_np_arr is None:
                     image_np_arr = cv2.imread(str(image_fp))
                     image_np_arr = cv2.cvtColor(image_np_arr, cv2.COLOR_BGR2RGB)
-
+                    
                 # expects 3 channels
                 if image_np_arr.shape[2] == 1:
                     image_np_arr = np.concatenate([image_np_arr] * 3, axis=-1)
