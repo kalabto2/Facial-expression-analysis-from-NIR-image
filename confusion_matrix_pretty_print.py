@@ -71,7 +71,7 @@ def configcell_text_and_colors(array_df, lin, col, oText, facecolors, posi, fz, 
         text_kwargs = dict(color='w', ha="center", va="center", gid='sum', fontproperties=font_prop)
         lis_txt = ['%d'%(cell_val), per_ok_s, '%.2f%%'%(per_err)]
         lis_kwa = [text_kwargs]
-        dic = text_kwargs.copy(); dic['color'] = 'g'; lis_kwa.append(dic);
+        dic = text_kwargs.copy(); dic['color'] = 'green'; lis_kwa.append(dic);
         dic = text_kwargs.copy(); dic['color'] = 'r'; lis_kwa.append(dic);
         lis_pos = [(oText._x, oText._y-0.3), (oText._x, oText._y), (oText._x, oText._y+0.3)]
         for i in range(len(lis_txt)):
@@ -101,7 +101,7 @@ def configcell_text_and_colors(array_df, lin, col, oText, facecolors, posi, fz, 
         #main diagonal
         if(col == lin):
             #set color of the textin the diagonal to white
-            oText.set_color('w')
+            oText.set_color('red')
             # set background color in the diagonal to blue
             facecolors[posi] = [0.35, 0.8, 0.55, 1.0]
         else:
@@ -152,9 +152,12 @@ def pretty_plot_confusion_matrix(df_cm, annot=True, cmap="Oranges", fmt='.2f', f
     #this is for print allways in the same window
     fig, ax1 = get_new_fig('Conf matrix default', figsize)
 
+    sub_data = df_cm.iloc[:-1, :-1].values
+    norm = plt.Normalize(sub_data.min(), sub_data.max())
+    
     #thanks for seaborn
     ax = sn.heatmap(df_cm, annot=annot, annot_kws={"size": fz}, linewidths=lw, ax=ax1,
-                    cbar=cbar, cmap=cmap, linecolor='w', fmt=fmt)
+                    cbar=cbar, cmap="Blues", linecolor='w', fmt=fmt, norm=norm)
 
     #set ticklabels rotation
     ax.set_xticklabels(ax.get_xticklabels(), rotation = 45, fontsize = 10)
