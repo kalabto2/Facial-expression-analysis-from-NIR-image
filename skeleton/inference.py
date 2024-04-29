@@ -239,9 +239,12 @@ class MobileNet(object):
         return resized
 
     def run(self, image):
+        image = np.expand_dims(image, axis=0).astype(np.float32)/127.5
+        # Samplewise centering
+        image = image - np.mean(image)
         output = self.mobilenet.run(
             None,
-            {self.mobilenet_input_name: np.expand_dims(image, axis=0).astype(np.float32)/255},
+            {self.mobilenet_input_name: image},
         )
 
         return output
