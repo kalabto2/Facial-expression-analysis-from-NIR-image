@@ -18,8 +18,10 @@ import matplotlib.pyplot as plt
 from IPython.display import display
 import copy
 import io
+from tqdm import tqdm
 
-
+emotion_labels_list = ["Neutral", "Happy", "Sad", "Surprise", "Fear", "Disgust", "Anger", "Contempt", "None"]
+emotion_labels_dict = {0: "Neutral",1: "Happy",2: "Sad",3: "Surprise",4: "Fear",5: "Disgust",6: "Anger",7: "Contempt",8: "None",}
 
 
 def extract_square_roi(image, x, y, w, h):
@@ -353,6 +355,9 @@ class MobileNet(object):
             dashboard_figure = self.interpret_output(image, output)
         else:
             dashboard_figure = None
+            
+        output[1][0][0] = (output[1][0][0] - 0.5) * 2
+        output[1][0][1] = (output[1][0][1] - 0.5) * 2
 
         return output, dashboard_figure
     
@@ -599,9 +604,10 @@ class Orig_CycleGAN:
 ###############################
 
 class CenterFace(object):
-    def __init__(self, landmarks=True):
+    def __init__(self, landmarks=True, verbose=True):
         self.input_shape = (224, 224)
         self.landmarks = landmarks
+        self.verbose = verbose
 
         self.net = cv2.dnn.readNetFromONNX("models/face_detection/centerface.onnx")
         self.img_h_new, self.img_w_new, self.scale_h, self.scale_w = 0, 0, 0, 0
@@ -639,7 +645,8 @@ class CenterFace(object):
         else:
             heatmap, scale, offset = self.net.forward(["535", "536", "537"])
         end = datetime.datetime.now()
-        print("cpu times = ", end - begin)
+        if self.verbose:
+            print("cpu times = ", end - begin)
         return self.postprocess(heatmap, lms, offset, scale, threshold)
 
     def transform(self, h, w):
@@ -824,7 +831,7 @@ class Inference:
         if model["net_type"] == Inference.net_type.FACE_DETECTOR_RETINAFACE:
             self.face_detector_model = 'retinaface'
         elif model["net_type"] == Inference.net_type.FACE_DETECTOR_CENTERFACE:
-            self.face_detector_model = CenterFace()
+            self.face_detector_model = CenterFace(verbose=self.verbose)
         else:
             raise NotImplementedError
 
@@ -1104,8 +1111,175 @@ class Inference:
     
     def infer_instant_from_filenames(self, images: np.array):
         return self._infer_instant(images, self._from_filenames)
+
+    
+    def process_frame(self, frame):
+        det, spec, fer = self.infer_instant_from_array([frame])[0]
         
-    # -------------------------------------------------------------------------------
+        assert fer is not None and det is not None, "FER model must be set up, else this is useless."
+        
+        for detection, fer_out in zip(det, fer):
+            # Extract the facial area coordinates and convert them to integers
+            x, y, w, h = map(int, detection['facial_area'].values())
+
+            # Calculate the bottom-right corner of the rectangle
+            x2 = x + w
+            y2 = y + h
+
+            # Ensure the coordinates are within the frame boundaries
+            x, y, x2, y2 = max(0, x), max(0, y), min(frame.shape[1] - 1, x2), min(frame.shape[0] - 1, y2)
+
+            # Define the color for the rectangle (BGR format)
+            rectangle_color = (0, 255, 0)  # Green color
+
+            # Draw the rectangle on the frame
+            cv2.rectangle(frame, (x, y), (x2, y2), rectangle_color, 2)
+
+            # Get the predicted emotions
+            em1_idx = np.argmax(fer_out[0][0][0])
+            em1_name = emotion_labels_dict[em1_idx].upper()  # Convert to uppercase
+            em2_idx = np.argsort(fer_out[0][0][0])[-2]
+            em2_name = emotion_labels_dict[em2_idx].lower()  # Second best prediction
+            em3_idx = np.argsort(fer_out[0][0][0])[-3]
+            em3_name = emotion_labels_dict[em3_idx].lower()  # Third best prediction
+
+            # Set the font and initialize font_scale and thickness for the main emotion
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale_main = 0.5
+            font_thickness_main = 2
+
+            # Calculate the best font size to fit the main emotion text width to the rectangle width
+            margin = int(w * 0.05)  # 5% margin of the rectangle width
+            text_width_main = cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][0]
+            while text_width_main < w - 2 * margin:  # Subtract margins from both sides
+                font_scale_main += 0.1
+                text_width_main = cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][0]
+
+            # Adjust font scale down if it's too wide
+            while text_width_main > w - 2 * margin:
+                font_scale_main -= 0.05
+                text_width_main = cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][0]
+
+            # Calculate text position for the main emotion (inside the rectangle, just below the top border)
+            text_x_main = x + margin
+            text_y_main = y + margin + cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][1]
+
+            # Put the main emotion text on the frame
+            cv2.putText(frame, em1_name, (text_x_main, text_y_main), font, font_scale_main, rectangle_color, font_thickness_main)
+
+            # Set font scale and thickness for the secondary emotions
+            font_scale_secondary = 0.4
+            font_thickness_secondary = 1
+
+            # Calculate text position for the secondary emotions (below the main emotion text)
+            text_y_secondary = text_y_main + 5 + cv2.getTextSize(em2_name, font, font_scale_secondary, font_thickness_secondary)[0][1]
+
+            # Define a less contrasting color for the secondary emotions (lighter green)
+            secondary_color = (150, 255, 150)  # Lighter green color
+
+            # Put the secondary emotion texts on the frame
+            cv2.putText(frame, em2_name + ", " + em3_name, (text_x_main, text_y_secondary), font, font_scale_secondary, secondary_color, font_thickness_secondary)
+            
+
+#             # Draw a filled white circle at the bottom left of the rectangle
+#             circle_diameter = h // 4
+#             circle_radius = circle_diameter // 2
+#             circle_center = (x + circle_radius, y2 - circle_radius)
+#             cv2.circle(frame, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle
+
+            # Create a transparent overlay
+            overlay = frame.copy()
+
+            # Draw a filled white circle at the bottom left of the rectangle on the overlay
+            circle_diameter = h // 4
+            circle_radius = circle_diameter // 2
+            circle_center = (x + circle_radius, y2 - circle_radius)
+            cv2.circle(overlay, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle on overlay
+
+            # Apply the overlay with 50% transparency
+            cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+
+            # For the second version with 80% transparency
+            overlay2 = frame.copy()
+            cv2.circle(overlay2, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle on overlay2
+            cv2.circle(overlay2, circle_center, circle_radius, (0, 0, 0), 4)  # Bold black circumference
+            cv2.circle(overlay2, circle_center, 5, (0, 0, 0), -1)  # Highlighted center
+
+            # Apply the overlay with 80% transparency
+            cv2.addWeighted(overlay2, 0.2, frame, 0.8, 0, frame)
+            
+            # Get valence and arousal values
+            valence = fer_out[0][1][0][0]
+            arousal = fer_out[0][1][0][1]
+
+            # Map valence and arousal values to circle coordinates
+            dot_x = int(circle_center[0] + int(valence * circle_radius))
+            dot_y = int(circle_center[1] - int(arousal * circle_radius))
+
+            # Draw the green dot on the circle
+            green_dot_color = (0, 255, 0)  # Green color
+            cv2.circle(frame, (dot_x, dot_y), 5, green_dot_color, -1)  # Small filled green dot
+
+
+        return frame
+
+    
+    def infer_video(self, input_path, output_path, frame_frequency):
+        # Load the video
+        cap = cv2.VideoCapture(input_path)
+        if not cap.isOpened():
+            print("Error: Could not open video.")
+            return None
+
+        # Get video properties
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        codec = cv2.VideoWriter_fourcc(*'mp4v')
+
+        # Assert that the frame_frequency is less than or equal to the fps
+        assert frame_frequency <= fps, "frame_frequency must be less than or equal to the video's fps"
+
+        # Calculate the number of frames to duplicate based on the frequency
+        duplicate_frames = int(fps / frame_frequency) if frame_frequency >= 1 else int(fps / frame_frequency)
+
+        # Create a VideoWriter object to write the video
+        out = cv2.VideoWriter(output_path, codec, fps, (width, height))
+
+        # Initialize tqdm progress bar
+        pbar = tqdm(total=frame_count, desc='Processing frames')
+
+        # Process the video
+        frame_id = 0
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            # Update tqdm progress bar
+            pbar.update(1)
+
+            # Process every nth frame
+            if frame_id % duplicate_frames == 0:
+                # Apply the process_frame method to the frame
+                adjusted_frame = self.process_frame(frame)
+
+                # Duplicate the frame based on the frequency
+                for _ in range(duplicate_frames):
+                    out.write(adjusted_frame)
+
+            frame_id += 1
+
+        # Close tqdm progress bar
+        pbar.close()
+
+        # Release everything when done
+        cap.release()
+        out.release()
+        cv2.destroyAllWindows()
+        return None
+        # -------------------------------------------------------------------------------
 
     @staticmethod
     def save_images_to_folder(images, folder: Union[str|pathlib.Path], img_format="png") -> None:
