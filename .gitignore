@@ -1,5 +1,6 @@
 # Ignore Data Folder
 /data/
+/example_data/
 
 # Ignore CustomDB data in Custom_DB/
 # /Custom_DB/custom_nir/
@@ -23,3 +24,9 @@ Custom_DB/.ipynb_checkpoints/Custom_DB-checkpoint.ipynb
 
 # Ignore old or other content - starting with '_'
 **/_*/**
+
+# Ignore folders produced by pip when in stalling cutom package - FaceInference
+*.egg-info
+/skeleton/build/
+
+
