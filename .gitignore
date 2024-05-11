@@ -1,32 +1,32 @@
 # Ignore Data Folder
-/data/
-/example_data/
+/src/data/
+/src/example_data/
 
 # Ignore CustomDB data in Custom_DB/
-# /Custom_DB/custom_nir/
+# /src/Custom_DB/custom_nir/
 
 # Ignore virtual environment
-/venv*
+/src/venv*
 
 # Ignore some development folders
-/experiments/logs/
-/notebooks/
+/src/experiments/logs/
+/src/notebooks/
 
 # Ignore Jetbrains cache
 **/__pycache__/
-/.idea/
+/src/.idea/
 
 # Ignore Jupyter notebook Checkpoints
 **/.ipynb_checkpoints/**
-/Custom_DB/.ipynb_checkpoints/
-.ipynb_checkpoints
-Custom_DB/.ipynb_checkpoints/Custom_DB-checkpoint.ipynb
+/src/Custom_DB/.ipynb_checkpoints/
+/src/.ipynb_checkpoints
+/src/Custom_DB/.ipynb_checkpoints/Custom_DB-checkpoint.ipynb
 
 # Ignore old or other content - starting with '_'
 **/_*/**
 
 # Ignore folders produced by pip when in stalling cutom package - FaceInference
-*.egg-info
-/skeleton/build/
+/src/skeleton/*.egg-info
+/src/skeleton/build/
 
 
