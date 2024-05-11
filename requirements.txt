@@ -38,3 +38,13 @@ deepface==0.0.79
 scikit-image==0.21.0
 scipy~=1.11.0
 autopep8
+
+
+# For code from 'mobilenet' branch
+tensorflow
+joblib
+optuna
+optuna-integration
+plotly
+tf2onnx
+ipykernel
