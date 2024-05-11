@@ -49,7 +49,7 @@ Python module named FaceInference can be installed to pip with the following:
 # source venv/bin/activate
 
 # change to the directory and install the module
-cd skleton
+cd skeleton
 pip install .
 ```
 
