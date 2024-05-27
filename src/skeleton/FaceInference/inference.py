@@ -1126,112 +1126,166 @@ class Inference:
 
     
     def process_frame(self, frame):
+        orig_frame = copy.deepcopy(frame)
         det, spec, fer = self.infer_instant_from_array([frame])[0]
         
         assert fer is not None and det is not None, "FER model must be set up, else this is useless."
         
         for detection, fer_out in zip(det, fer):
-            # Extract the facial area coordinates and convert them to integers
-            x, y, w, h = map(int, detection['facial_area'].values())
+            try:
+                # Extract the facial area coordinates and convert them to integers
+                x, y, w, h = map(int, detection['facial_area'].values())
 
-            # Calculate the bottom-right corner of the rectangle
-            x2 = x + w
-            y2 = y + h
+                # Calculate the bottom-right corner of the rectangle
+                x2 = x + w
+                y2 = y + h
 
-            # Ensure the coordinates are within the frame boundaries
-            x, y, x2, y2 = max(0, x), max(0, y), min(frame.shape[1] - 1, x2), min(frame.shape[0] - 1, y2)
+                # Ensure the coordinates are within the frame boundaries
+                x, y, x2, y2 = max(0, x), max(0, y), min(frame.shape[1] - 1, x2), min(frame.shape[0] - 1, y2)
 
-            # Define the color for the rectangle (BGR format)
-            rectangle_color = (0, 255, 0)  # Green color
+                # Define the color for the rectangle (BGR format)
+                rectangle_color = (0, 255, 0)  # Green color
 
-            # Draw the rectangle on the frame
-            cv2.rectangle(frame, (x, y), (x2, y2), rectangle_color, 2)
+                # Draw the rectangle on the frame
+                cv2.rectangle(frame, (x, y), (x2, y2), rectangle_color, 2)
 
-            # Get the predicted emotions
-            em1_idx = np.argmax(fer_out[0][0][0])
-            em1_name = emotion_labels_dict[em1_idx].upper()  # Convert to uppercase
-            em2_idx = np.argsort(fer_out[0][0][0])[-2]
-            em2_name = emotion_labels_dict[em2_idx].lower()  # Second best prediction
-            em3_idx = np.argsort(fer_out[0][0][0])[-3]
-            em3_name = emotion_labels_dict[em3_idx].lower()  # Third best prediction
+                # Get the predicted emotions
+                em1_idx = np.argmax(fer_out[0][0][0])
+                em1_name = emotion_labels_dict[em1_idx].upper()  # Convert to uppercase
+                em2_idx = np.argsort(fer_out[0][0][0])[-2]
+                em2_name = emotion_labels_dict[em2_idx].lower()  # Second best prediction
+                em3_idx = np.argsort(fer_out[0][0][0])[-3]
+                em3_name = emotion_labels_dict[em3_idx].lower()  # Third best prediction
 
-            # Set the font and initialize font_scale and thickness for the main emotion
-            font = cv2.FONT_HERSHEY_SIMPLEX
-            font_scale_main = 0.5
-            font_thickness_main = 2
+                # Set the font and initialize font_scale and thickness for the main emotion
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                font_scale_main = 0.5
+                font_thickness_main = 2
 
-            # Calculate the best font size to fit the main emotion text width to the rectangle width
-            margin = int(w * 0.05)  # 5% margin of the rectangle width
-            text_width_main = cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][0]
-            while text_width_main < w - 2 * margin:  # Subtract margins from both sides
-                font_scale_main += 0.1
+                # Calculate the best font size to fit the main emotion text width to the rectangle width
+                margin = int(w * 0.05)  # 5% margin of the rectangle width
                 text_width_main = cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][0]
+                while text_width_main < w - 2 * margin:  # Subtract margins from both sides
+                    font_scale_main += 0.1
+                    text_width_main = cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][0]
 
-            # Adjust font scale down if it's too wide
-            while text_width_main > w - 2 * margin:
-                font_scale_main -= 0.05
-                text_width_main = cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][0]
+                # Adjust font scale down if it's too wide
+                while text_width_main > w - 2 * margin:
+                    font_scale_main -= 0.05
+                    text_width_main = cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][0]
 
-            # Calculate text position for the main emotion (inside the rectangle, just below the top border)
-            text_x_main = x + margin
-            text_y_main = y + margin + cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][1]
+                # Calculate text position for the main emotion (inside the rectangle, just below the top border)
+                text_x_main = x + margin
+                text_y_main = y + margin + cv2.getTextSize(em1_name, font, font_scale_main, font_thickness_main)[0][1]
 
-            # Put the main emotion text on the frame
-            cv2.putText(frame, em1_name, (text_x_main, text_y_main), font, font_scale_main, rectangle_color, font_thickness_main)
+                # Put the main emotion text on the frame
+                cv2.putText(frame, em1_name, (text_x_main, text_y_main), font, font_scale_main, rectangle_color, font_thickness_main)
 
-            # Set font scale and thickness for the secondary emotions
-            font_scale_secondary = 0.4
-            font_thickness_secondary = 1
+                # Set font scale and thickness for the secondary emotions
+                font_scale_secondary = 0.4
+                font_thickness_secondary = 1
 
-            # Calculate text position for the secondary emotions (below the main emotion text)
-            text_y_secondary = text_y_main + 5 + cv2.getTextSize(em2_name, font, font_scale_secondary, font_thickness_secondary)[0][1]
+                # Calculate text position for the secondary emotions (below the main emotion text)
+#                 text_y_secondary = text_y_main  + cv2.getTextSize(em2_name, font, font_scale_secondary, font_thickness_secondary)[0][1] + cv2.getTextSize(em2_name, font, font_scale_secondary, font_thickness_secondary)[0][1]
+#                 print(cv2.getTextSize(em2_name, font, font_scale_secondary, font_thickness_secondary)[0][1], text_y_main)
 
-            # Define a less contrasting color for the secondary emotions (lighter green)
-            secondary_color = (150, 255, 150)  # Lighter green color
+                # Define a less contrasting color for the secondary emotions (lighter green)
+                secondary_color = (150, 255, 150)  # Lighter green color
 
-            # Put the secondary emotion texts on the frame
-            cv2.putText(frame, em2_name + ", " + em3_name, (text_x_main, text_y_secondary), font, font_scale_secondary, secondary_color, font_thickness_secondary)
-            
+#                 # Put the secondary emotion texts on the frame
+#                 cv2.putText(frame, em2_name + ", " + em3_name, (text_x_main, text_y_secondary), font, font_scale_secondary, secondary_color, font_thickness_secondary)
 
-#             # Draw a filled white circle at the bottom left of the rectangle
-#             circle_diameter = h // 4
-#             circle_radius = circle_diameter // 2
-#             circle_center = (x + circle_radius, y2 - circle_radius)
-#             cv2.circle(frame, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle
 
-            # Create a transparent overlay
-            overlay = frame.copy()
+                # Calculate the best font size to fit the secondary emotions text width to the rectangle width
+                text_width_secondary = cv2.getTextSize(em2_name + ", " + em3_name, font, font_scale_secondary, font_thickness_secondary)[0][0]
+                while text_width_secondary < w - 2 * margin:  # Subtract margins from both sides
+                    font_scale_secondary += 0.1
+                    text_width_secondary = cv2.getTextSize(em2_name + ", " + em3_name, font, font_scale_secondary, font_thickness_secondary)[0][0]
 
-            # Draw a filled white circle at the bottom left of the rectangle on the overlay
-            circle_diameter = h // 4
-            circle_radius = circle_diameter // 2
-            circle_center = (x + circle_radius, y2 - circle_radius)
-            cv2.circle(overlay, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle on overlay
+                # Adjust font scale down if it's too wide
+                while text_width_secondary > w - 2 * margin:
+                    font_scale_secondary -= 0.05
+                    text_width_secondary = cv2.getTextSize(em2_name + ", " + em3_name, font, font_scale_secondary, font_thickness_secondary)[0][0]
+                text_y_secondary = text_y_main  + margin + cv2.getTextSize(em2_name + ", " + em3_name, font, font_scale_secondary, font_thickness_secondary)[0][1]
 
-            # Apply the overlay with 50% transparency
-            cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+                # Put the secondary emotion texts on the frame with the adjusted font scale
+                cv2.putText(frame, em2_name + ", " + em3_name, (text_x_main, text_y_secondary), font, font_scale_secondary, secondary_color, font_thickness_secondary)
 
-            # For the second version with 80% transparency
-            overlay2 = frame.copy()
-            cv2.circle(overlay2, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle on overlay2
-            cv2.circle(overlay2, circle_center, circle_radius, (0, 0, 0), 4)  # Bold black circumference
-            cv2.circle(overlay2, circle_center, 5, (0, 0, 0), -1)  # Highlighted center
 
-            # Apply the overlay with 80% transparency
-            cv2.addWeighted(overlay2, 0.2, frame, 0.8, 0, frame)
-            
-            # Get valence and arousal values
-            valence = fer_out[0][1][0][0]
-            arousal = fer_out[0][1][0][1]
+#                 # Calculate the best font size to fit the secondary emotions text width to the rectangle width
+#                 text_width_secondary = cv2.getTextSize(em2_name, font, font_scale_secondary, font_thickness_secondary)[0][0]
+#                 while text_width_secondary < w - 2 * margin:  # Subtract margins from both sides
+#                     font_scale_secondary += 0.1
+#                     text_width_secondary = cv2.getTextSize(em2_name, font, font_scale_secondary, font_thickness_secondary)[0][0]
 
-            # Map valence and arousal values to circle coordinates
-            dot_x = int(circle_center[0] + int(valence * circle_radius))
-            dot_y = int(circle_center[1] - int(arousal * circle_radius))
+#                 # Adjust font scale down if it's too wide
+#                 while text_width_secondary > w - 2 * margin:
+#                     font_scale_secondary -= 0.05
+#                     text_width_secondary = cv2.getTextSize(em2_name, font, font_scale_secondary, font_thickness_secondary)[0][0]
 
-            # Draw the green dot on the circle
-            green_dot_color = (0, 255, 0)  # Green color
-            cv2.circle(frame, (dot_x, dot_y), 5, green_dot_color, -1)  # Small filled green dot
+#                 # Put the secondary emotion texts on the frame with the adjusted font scale
+#                 cv2.putText(frame, em2_name, (text_x_main, text_y_secondary), font, font_scale_secondary, secondary_color, font_thickness_secondary)
 
+
+
+#                 # Calculate the best font size to fit the tertiery emotion text width to the rectangle width
+#                 text_width_secondary = cv2.getTextSize(em3_name, font, font_scale_secondary, font_thickness_secondary)[0][0]
+#                 while text_width_secondary < w - 2 * margin:  # Subtract margins from both sides
+#                     font_scale_secondary += 0.1
+#                     text_width_secondary = cv2.getTextSize(em3_name, font, font_scale_secondary, font_thickness_secondary)[0][0]
+
+#                 # Adjust font scale down if it's too wide
+#                 while text_width_secondary > w - 2 * margin:
+#                     font_scale_secondary -= 0.05
+#                     text_width_secondary, text_height_secondary = cv2.getTextSize(em3_name, font, font_scale_secondary, font_thickness_secondary)[0]
+       
+
+#                 # Put the secondary emotion texts on the frame with the adjusted font scale
+#                 cv2.putText(frame, em3_name, (text_x_main, text_y_secondary + margin + text_height_secondary), font, font_scale_secondary, secondary_color, font_thickness_secondary)
+
+
+
+                # Draw a filled white circle at the bottom left of the rectangle
+                circle_diameter = h // 4
+                circle_radius = circle_diameter // 2
+                circle_center = (x + circle_radius, y2 - circle_radius)
+                cv2.circle(frame, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle
+
+                # Create a transparent overlay
+                overlay = frame.copy()
+
+                # Draw a filled white circle at the bottom left of the rectangle on the overlay
+                circle_diameter = h // 4
+                circle_radius = circle_diameter // 2
+                circle_center = (x + circle_radius, y2 - circle_radius)
+                cv2.circle(overlay, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle on overlay
+
+                # Apply the overlay with 50% transparency
+                cv2.addWeighted(overlay, 0.5, frame, 0.5, 0, frame)
+
+                # For the second version with 80% transparency
+                overlay2 = frame.copy()
+                cv2.circle(overlay2, circle_center, circle_radius, (255, 255, 255), -1)  # Filled circle on overlay2
+                cv2.circle(overlay2, circle_center, circle_radius, (0, 0, 0), 4)  # Bold black circumference
+                cv2.circle(overlay2, circle_center, 5, (0, 0, 0), -1)  # Highlighted center
+
+                # Apply the overlay with 80% transparency
+                cv2.addWeighted(overlay2, 0.2, frame, 0.8, 0, frame)
+
+                # Get valence and arousal values
+                valence = fer_out[0][1][0][0]
+                arousal = fer_out[0][1][0][1]
+
+                # Map valence and arousal values to circle coordinates
+                dot_x = int(circle_center[0] + int(valence * circle_radius))
+                dot_y = int(circle_center[1] - int(arousal * circle_radius))
+
+                # Draw the green dot on the circle
+                green_dot_color = (0, 255, 0)  # Green color
+                cv2.circle(frame, (dot_x, dot_y), 5, green_dot_color, -1)  # Small filled green dot
+            except Exception as e:
+                print("Exception occured:", e)
+                return orig_frame
 
         return frame
 
