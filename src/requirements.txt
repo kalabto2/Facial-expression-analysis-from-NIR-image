@@ -22,7 +22,7 @@ tqdm==4.65.0
 
 # useful for automatically formatting your code
 # in one style (but not required)
-black==22.12.0
+black>=26.3.1
 
 # # official evaluation metric
 git+https://github.com/bsxfan/PYLLR.git
